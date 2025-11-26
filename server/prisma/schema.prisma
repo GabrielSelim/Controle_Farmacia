@@ -1,0 +1,131 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(uuid())
+  email             String   @unique
+  name              String?
+  passwordHash      String?
+  role              String   // 'farmaceutico' | 'chefe' | 'admin' | 'assistente'
+  telefone          String?  // número formato internacional: 5516799...
+  telefone_whatsapp String?  // opcional
+  callmebot_key     String?  // armazenar encriptado
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  shifts            Shift[]
+  recordsDelivered  Record[] @relation("deliveredBy")
+  recordsReceived   Record[] @relation("receivedBy")
+}
+
+model Medicamento {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  unit      String
+  location  String?
+  createdAt DateTime @default(now())
+  records   Record[]
+}
+
+model Shift {
+  id               String   @id @default(uuid())
+  start            DateTime
+  end              DateTime
+  employee         User?    @relation(fields: [employeeId], references: [id])
+  employeeId       String?  // pode ser farmaceutico, chefe ou assistente
+  notificationSent Boolean  @default(false)
+  createdBy        String?
+}
+
+model Record {
+  id            String        @id @default(uuid())
+  medId         String
+  med           Medicamento   @relation(fields: [medId], references: [id])
+  date          DateTime      @default(now())
+  shiftStart    DateTime?
+  shiftEnd      DateTime?
+  qtyDelivered  Int?
+  qtyReceived   Int?
+  deliveredById String?
+  deliveredBy   User?         @relation("deliveredBy", fields: [deliveredById], references: [id])
+  receivedById  String?
+  receivedBy    User?         @relation("receivedBy", fields: [receivedById], references: [id])
+  deliveredAt   DateTime?
+  receivedAt    DateTime?
+  photoUrl      String?
+  status        String        // 'pendente'|'finalizado'|'discrepancia'
+  createdBy     String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  auditLogs     AuditLog[]
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  recordId  String?
+  record    Record?  @relation(fields: [recordId], references: [id])
+  action    String
+  field     String?
+  oldValue  String?
+  newValue  String?
+  userEmail String?
+  createdAt DateTime @default(now())
+}
+
+// Modelo para ausências/folgas
+model Absence {
+  id          String   @id @default(uuid())
+  userId      String
+  userEmail   String
+  userName    String
+  date        DateTime
+  reason      String?  // 'folga', 'ferias', 'atestado', 'outro'
+  description String?
+  approvedBy  String?
+  createdAt   DateTime @default(now())
+}
+
+// Modelo para solicitações de troca de plantão
+model ShiftSwapRequest {
+  id              String   @id @default(uuid())
+  shiftId         String
+  shiftDate       DateTime
+  requesterId     String
+  requesterEmail  String
+  requesterName   String
+  targetId        String?
+  targetEmail     String?
+  targetName      String?
+  targetShiftId   String?   // ID do plantão do colega para troca bilateral
+  reason          String?
+  status          String   // 'pendente' | 'aceito' | 'recusado' | 'cancelado'
+  respondedAt     DateTime?
+  approvedBy      String?  // chefe/admin que aprovou
+  approvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Modelo para timeline de atividades
+model ActivityLog {
+  id          String   @id @default(uuid())
+  type        String   // 'record_created', 'record_received', 'shift_created', 'swap_requested', 'absence_created', etc
+  userId      String
+  userEmail   String
+  userName    String
+  entityType  String?  // 'record', 'shift', 'swap', 'absence', 'user'
+  entityId    String?
+  description String
+  metadata    String?  // JSON string com dados adicionais
+  createdAt   DateTime @default(now())
+}
