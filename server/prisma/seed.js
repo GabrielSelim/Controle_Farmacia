@@ -6,13 +6,16 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados...');
 
+  // Deletar usuário existente se houver
+  await prisma.user.deleteMany({
+    where: { username: 'gabriel.sanz' }
+  });
+
   // Criar usuário admin
   const passwordHash = await bcrypt.hash('teste123', 10);
   
-  const admin = await prisma.user.upsert({
-    where: { username: 'gabriel.sanz' },
-    update: {},
-    create: {
+  const admin = await prisma.user.create({
+    data: {
       id: 'admin-001',
       username: 'gabriel.sanz',
       name: 'Gabriel Sanz',
