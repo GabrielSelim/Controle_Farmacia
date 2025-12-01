@@ -1,6 +1,9 @@
 # Imagem base Node.js
 FROM node:18-alpine
 
+# Instalar dependências do sistema para Prisma
+RUN apk add --no-cache openssl libc6-compat
+
 # Diretório de trabalho
 WORKDIR /app
 
