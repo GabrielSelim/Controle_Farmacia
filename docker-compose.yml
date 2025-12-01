@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Backend API
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: farmacia_server
+    restart: unless-stopped
+    ports:
+      - "3003:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/controle_farmacia.db
+      - JWT_SECRET=${JWT_SECRET:-seu_secret_jwt_super_seguro_aqui_mude_em_producao}
+      - CALLMEBOT_MASTER_KEY=${CALLMEBOT_MASTER_KEY:-sua_chave_mestra_aes256_para_criptografia}
+      - PORT=3001
+      - CORS_ORIGINS=http://localhost,http://localhost:8080
+    volumes:
+      # Volume para banco de dados SQLite (persiste mesmo após docker-compose down)
+      - db_data:/app/data
+      # Volume para uploads (persiste fotos)
+      - uploads_data:/app/uploads
+    networks:
+      - farmacia_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Web
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: farmacia_web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - server
+    networks:
+      - farmacia_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  farmacia_network:
+    driver: bridge
+
+volumes:
+  # Volume nomeado para o banco de dados - dados persistem mesmo com down
+  db_data:
+    driver: local
+  # Volume nomeado para uploads - fotos persistem mesmo com down
+  uploads_data:
+    driver: local
