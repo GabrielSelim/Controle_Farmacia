@@ -25,6 +25,7 @@ export default function Timeline() {
     startDate: '',
     endDate: ''
   });
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
 
   const isChefOrAdmin = hasRole(['chefe', 'admin']);
 
