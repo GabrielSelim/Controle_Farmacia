@@ -236,7 +236,7 @@ export default function Records() {
                           <div className="text-xs text-gray-500">{record.med?.code}</div>
                         </td>
                         <td>
-                          {record.deliveredBy?.name || record.deliveredBy?.email || '-'}
+                          {record.deliveredBy?.name || record.deliveredBy?.username || '-'}
                           <br />
                           {record.deliveredAt && (
                             <span className="text-xs text-gray-500">
@@ -245,7 +245,7 @@ export default function Records() {
                           )}
                         </td>
                         <td>
-                          {record.receivedBy?.name || record.receivedBy?.email || '-'}
+                          {record.receivedBy?.name || record.receivedBy?.username || '-'}
                           <br />
                           {record.receivedAt && (
                             <span className="text-xs text-gray-500">
@@ -314,7 +314,7 @@ export default function Records() {
                       <div>
                         <span className="text-gray-600">Entregue por:</span>
                         <p className="font-medium text-gray-900 truncate">
-                          {record.deliveredBy?.name || record.deliveredBy?.email || '-'}
+                          {record.deliveredBy?.name || record.deliveredBy?.username || '-'}
                         </p>
                         {record.deliveredAt && (
                           <p className="text-xs text-gray-500">
@@ -325,7 +325,7 @@ export default function Records() {
                       <div>
                         <span className="text-gray-600">Recebido por:</span>
                         <p className="font-medium text-gray-900 truncate">
-                          {record.receivedBy?.name || record.receivedBy?.email || '-'}
+                          {record.receivedBy?.name || record.receivedBy?.username || '-'}
                         </p>
                         {record.receivedAt && (
                           <p className="text-xs text-gray-500">

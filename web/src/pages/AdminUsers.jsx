@@ -12,7 +12,7 @@ export default function AdminUsers() {
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     name: '',
     password: '',
     role: 'farmaceutico',
@@ -40,7 +40,7 @@ export default function AdminUsers() {
     if (user) {
       setEditingUser(user);
       setFormData({
-        email: user.email,
+        username: user.username,
         name: user.name || '',
         password: '',
         role: user.role,
@@ -170,7 +170,7 @@ export default function AdminUsers() {
                   <tr key={user.id}>
                     <td>
                       <div className="font-medium">{user.name || '-'}</div>
-                      <div className="text-xs text-gray-500">{user.email}</div>
+                      <div className="text-xs text-gray-500">{user.username}</div>
                     </td>
                     <td>
                       <span className={`text-xs px-2 py-1 rounded-full ${getRoleBadge(user.role)}`}>
@@ -227,7 +227,7 @@ export default function AdminUsers() {
                     <h3 className="font-semibold text-gray-900 text-base truncate">
                       {user.name || 'Sem nome'}
                     </h3>
-                    <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                    <p className="text-xs text-gray-500 truncate">{user.username}</p>
                   </div>
                   <div className="flex flex-col gap-1 ml-2">
                     <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${getRoleBadge(user.role)}`}>
@@ -361,16 +361,16 @@ export default function AdminUsers() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="label">Email *</label>
+                  <label className="label">Usuário *</label>
                   <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
+                    type="text"
+                    name="username"
+                    value={formData.username}
                     onChange={handleChange}
                     required
                     disabled={!!editingUser}
                     className="input"
-                    placeholder="usuario@exemplo.com"
+                    placeholder="seu.usuario"
                   />
                 </div>
 

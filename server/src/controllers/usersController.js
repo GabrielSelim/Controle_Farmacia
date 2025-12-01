@@ -10,7 +10,7 @@ export const listUsers = async (req, res) => {
     const users = await prisma.user.findMany({
       select: {
         id: true,
-        email: true,
+        username: true,
         name: true,
         role: true,
         telefone: true,
@@ -36,7 +36,7 @@ export const getUser = async (req, res) => {
       where: { id },
       select: {
         id: true,
-        email: true,
+        username: true,
         name: true,
         role: true,
         telefone: true,
@@ -99,7 +99,7 @@ export const updateUser = async (req, res) => {
       data: updateData,
       select: {
         id: true,
-        email: true,
+        username: true,
         name: true,
         role: true,
         telefone: true,

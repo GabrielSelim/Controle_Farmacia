@@ -80,11 +80,11 @@ export default function ShiftSwaps() {
         shiftId: formData.shiftId,
         shiftDate: shift.start,
         requesterId: user.id,
-        requesterEmail: user.email,
-        requesterName: user.name || user.email,
+        requesterUsername: user.username,
+        requesterName: user.name || user.username,
         targetId: formData.targetId || null,
-        targetEmail: target?.email || null,
-        targetName: target?.name || target?.email || null,
+        targetUsername: target?.username || null,
+        targetName: target?.name || target?.username || null,
         targetShiftId: formData.targetShiftId || null,
         reason: formData.reason
       });
@@ -329,7 +329,7 @@ export default function ShiftSwaps() {
                   <option value="all">👥 Todos os funcionários</option>
                   {users.map(u => (
                     <option key={u.id} value={u.id}>
-                      {u.name || u.email} • {u.role === 'farmaceutico' ? '💊 Farmacêutico' : u.role === 'chefe' ? '👔 Chefe' : u.role === 'admin' ? '⚙️ Admin' : u.role}
+                      {u.name || u.username} • {u.role === 'farmaceutico' ? '💊 Farmacêutico' : u.role === 'chefe' ? '👔 Chefe' : u.role === 'admin' ? '⚙️ Admin' : u.role}
                     </option>
                   ))}
                 </select>
@@ -594,7 +594,7 @@ export default function ShiftSwaps() {
                     })
                     .map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.name || u.email}
+                        {u.name || u.username}
                       </option>
                     ))}
                 </select>

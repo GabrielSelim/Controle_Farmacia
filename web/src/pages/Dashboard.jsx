@@ -182,7 +182,7 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">
-            Bem-vindo, {user?.name || user?.email}
+            Bem-vindo, {user?.name || user?.username}
           </h1>
           <p className="text-gray-600 mt-1">
             Painel de controle de medicamentos controlados
@@ -299,7 +299,7 @@ export default function Dashboard() {
                         <div className="flex-1">
                           <p className="font-medium text-gray-900">{record.med?.name}</p>
                           <p className="text-xs sm:text-sm text-gray-600">
-                            Entregue por: {record.deliveredBy?.name || record.deliveredBy?.email}
+                            Entregue por: {record.deliveredBy?.name || record.deliveredBy?.username}
                           </p>
                         </div>
                         <span className={`text-xs px-2 py-1 rounded-full self-start ${getStatusBadge(record.status)}`}>

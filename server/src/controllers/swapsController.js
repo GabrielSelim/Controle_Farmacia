@@ -4,7 +4,7 @@ const prisma = new PrismaClient();
 // Criar solicitação de troca
 export const createSwapRequest = async (req, res) => {
   try {
-    const { shiftId, shiftDate, requesterId, requesterEmail, requesterName, targetId, targetEmail, targetName, targetShiftId, reason } = req.body;
+    const { shiftId, shiftDate, requesterId, requesterUsername, requesterName, targetId, targetUsername, targetName, targetShiftId, reason } = req.body;
     
     // Validar regras de troca por role
     if (targetId) {
@@ -46,10 +46,10 @@ export const createSwapRequest = async (req, res) => {
         shiftId,
         shiftDate: new Date(shiftDate),
         requesterId,
-        requesterEmail,
+        requesterUsername,
         requesterName,
         targetId,
-        targetEmail,
+        targetUsername,
         targetName,
         targetShiftId,
         reason,
@@ -75,8 +75,8 @@ export const createSwapRequest = async (req, res) => {
       data: {
         type: 'swap_requested',
         userId: requesterId,
-        userEmail: requesterEmail,
-        userName: requesterName,
+        username: requesterUsername,
+        fullName: requesterName,
         entityType: 'swap',
         entityId: swap.id,
         description,
@@ -154,8 +154,8 @@ export const respondSwapRequest = async (req, res) => {
       data: {
         type: status === 'aceito' ? 'swap_accepted' : 'swap_rejected',
         userId: req.user?.id || swap.targetId,
-        userEmail: req.user?.email || swap.targetEmail,
-        userName: req.user?.name || swap.targetName,
+        username: req.user?.username || swap.targetUsername,
+        fullName: req.user?.name || swap.targetName,
         entityType: 'swap',
         entityId: id,
         description: `${swap.targetName} ${status === 'aceito' ? 'aceitou' : 'recusou'} a troca de plantão solicitada por ${swap.requesterName}`,
@@ -187,7 +187,7 @@ export const approveSwapRequest = async (req, res) => {
       where: { id },
       data: {
         status: 'aprovado',
-        approvedBy: req.user?.email,
+        approvedBy: req.user?.username,
         approvedAt: new Date()
       }
     });
@@ -217,11 +217,11 @@ export const approveSwapRequest = async (req, res) => {
       data: {
         type: 'swap_approved',
         userId: req.user?.id,
-        userEmail: req.user?.email,
-        userName: req.user?.name || req.user?.email || 'Administrador',
+        username: req.user?.username,
+        fullName: req.user?.name || req.user?.username || 'Administrador',
         entityType: 'swap',
         entityId: id,
-        description: `${req.user?.name || req.user?.email || 'Administrador'} aprovou a troca de plantão entre ${swap.requesterName} e ${swap.targetName}`,
+        description: `${req.user?.name || req.user?.username || 'Administrador'} aprovou a troca de plantão entre ${swap.requesterName} e ${swap.targetName}`,
         metadata: JSON.stringify({ shiftId: swap.shiftId })
       }
     });
@@ -258,8 +258,8 @@ export const cancelSwapRequest = async (req, res) => {
       data: {
         type: 'swap_cancelled',
         userId: req.user?.id,
-        userEmail: req.user?.email,
-        userName: req.user?.name,
+        username: req.user?.username,
+        fullName: req.user?.name,
         entityType: 'swap',
         entityId: id,
         description: `${req.user?.name} cancelou a solicitação de troca de plantão`,

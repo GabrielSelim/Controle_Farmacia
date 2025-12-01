@@ -210,7 +210,7 @@ export default function Timeline() {
     const csvData = dataToExport.map(activity => ({
       'Data/Hora': new Date(activity.createdAt).toLocaleString('pt-BR'),
       'Tipo': getTypeName(activity.type),
-      'Usuário': activity.userName,
+      'Usuário': activity.fullName,
       'Descrição': activity.description,
       'Entidade': translateEntityType(activity.entityType) || '-'
     }));
@@ -232,7 +232,7 @@ export default function Timeline() {
     const excelData = dataToExport.map(activity => ({
       'Data/Hora': new Date(activity.createdAt).toLocaleString('pt-BR'),
       'Tipo': getTypeName(activity.type),
-      'Usuário': activity.userName,
+      'Usuário': activity.fullName,
       'Descrição': activity.description,
       'Entidade': translateEntityType(activity.entityType) || '-'
     }));
@@ -266,7 +266,7 @@ export default function Timeline() {
     const tableData = dataToExport.map(activity => [
       new Date(activity.createdAt).toLocaleString('pt-BR'),
       getTypeName(activity.type),
-      activity.userName || '-',
+      activity.fullName || '-',
       activity.description || '-'
     ]);
 
@@ -487,7 +487,7 @@ export default function Timeline() {
                           {activity.description}
                         </p>
                         <div className="mt-1 flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-500">
-                          <span className="font-medium truncate">{activity.userName}</span>
+                          <span className="font-medium truncate">{activity.fullName}</span>
                           <span className="hidden sm:inline">•</span>
                           <span className="whitespace-nowrap">{formatDate(activity.createdAt)}</span>
                           {activity.entityType && (

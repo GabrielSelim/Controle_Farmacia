@@ -111,7 +111,7 @@ export default function Navbar() {
                     className="flex items-center space-x-2 text-sm focus:outline-none"
                   >
                     <div className="text-right">
-                      <p className="font-medium text-gray-900">{user.name || user.email}</p>
+                      <p className="font-medium text-gray-900">{user.name || user.username}</p>
                       <span className={`text-xs px-2 py-1 rounded-full ${getRoleBadge(user.role)}`}>
                         {user.role}
                       </span>
@@ -192,7 +192,7 @@ export default function Navbar() {
             <div className="pt-4 pb-3 border-b border-gray-200">
               {user && (
                 <div className="px-4">
-                  <p className="font-medium text-gray-900">{user.name || user.email}</p>
+                  <p className="font-medium text-gray-900">{user.name || user.username}</p>
                   <span className={`inline-block text-xs px-2 py-1 rounded-full mt-1 ${getRoleBadge(user.role)}`}>
                     {user.role}
                   </span>

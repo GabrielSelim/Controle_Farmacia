@@ -187,7 +187,7 @@ export default function ShiftHandoverModal({ user, onClose }) {
                                 Qtd. entregue: <strong>{record.qtyDelivered} {record.med?.unit}</strong>
                               </p>
                               <p className="text-xs text-gray-500 truncate">
-                                Por: {record.deliveredBy?.name || record.deliveredBy?.email}
+                                Por: {record.deliveredBy?.name || record.deliveredBy?.username}
                               </p>
                             </div>
                             <button className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium self-end sm:self-start min-h-[44px] sm:min-h-0">

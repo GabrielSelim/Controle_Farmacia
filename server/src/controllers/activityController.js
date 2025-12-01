@@ -103,14 +103,14 @@ export const getActivityStats = async (req, res) => {
 };
 
 // Registrar atividade manualmente (helper function)
-export const logActivity = async (type, userId, userEmail, userName, entityType, entityId, description, metadata = null) => {
+export const logActivity = async (type, userId, username, fullName, entityType, entityId, description, metadata = null) => {
   try {
     await prisma.activityLog.create({
       data: {
         type,
         userId,
-        userEmail,
-        userName,
+        username,
+        fullName,
         entityType,
         entityId,
         description,

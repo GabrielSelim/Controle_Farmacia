@@ -4,13 +4,13 @@ const prisma = new PrismaClient();
 // Criar ausência
 export const createAbsence = async (req, res) => {
   try {
-    const { userId, userEmail, userName, date, reason, description } = req.body;
+    const { userId, username, fullName, date, reason, description } = req.body;
     
     const absence = await prisma.absence.create({
       data: {
         userId,
-        userEmail,
-        userName,
+        username,
+        fullName,
         date: new Date(date),
         reason: reason || 'folga',
         description
@@ -22,11 +22,11 @@ export const createAbsence = async (req, res) => {
       data: {
         type: 'absence_created',
         userId: req.user?.id || userId,
-        userEmail: req.user?.email || userEmail,
-        userName: req.user?.name || userName,
+        username: req.user?.username || username,
+        fullName: req.user?.name || fullName,
         entityType: 'absence',
         entityId: absence.id,
-        description: `${userName} marcou ausência em ${new Date(date).toLocaleDateString('pt-BR')} - ${reason}`,
+        description: `${fullName} marcou ausência em ${new Date(date).toLocaleDateString('pt-BR')} - ${reason}`,
         metadata: JSON.stringify({ reason, description })
       }
     });
@@ -82,11 +82,11 @@ export const deleteAbsence = async (req, res) => {
       data: {
         type: 'absence_deleted',
         userId: req.user?.id || 'system',
-        userEmail: req.user?.email || 'system',
-        userName: req.user?.name || 'System',
+        username: req.user?.username || 'system',
+        fullName: req.user?.name || 'System',
         entityType: 'absence',
         entityId: id,
-        description: `Ausência de ${absence.userName} em ${new Date(absence.date).toLocaleDateString('pt-BR')} foi removida`
+        description: `Ausência de ${absence.fullName} em ${new Date(absence.date).toLocaleDateString('pt-BR')} foi removida`
       }
     });
 

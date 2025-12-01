@@ -15,7 +15,7 @@ export const sendWhatsAppNotification = async (req, res) => {
     // Verificar se o usuário tem permissão
     // Chefes e admins podem enviar para qualquer um
     // Farmacêuticos só podem enviar para si mesmos
-    if (req.user.role === 'farmaceutico' && email !== req.user.email) {
+    if (req.user.role === 'farmaceutico' && email !== req.user.username) {
       return res.status(403).json({ error: 'Você só pode enviar notificações para si mesmo' });
     }
 
@@ -82,9 +82,9 @@ export const notifyShift = async (req, res) => {
     const message = `🏥 Lembrete de Plantão\n\nOlá ${shift.pharmacist?.name || 'Farmacêutico'}!\n\nVocê tem um plantão agendado para:\n📅 ${startDate} às ${startTime}\n\nNão esqueça de registrar a contagem de medicamentos controlados.`;
 
     // Enviar WhatsApp
-    if (shift.pharmacist?.email) {
+    if (shift.pharmacist?.username) {
       try {
-        await sendWhatsAppToUserByEmail(shift.pharmacist.email, message);
+        await sendWhatsAppToUserByEmail(shift.pharmacist.username, message);
       } catch (error) {
       }
     }

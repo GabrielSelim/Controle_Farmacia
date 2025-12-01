@@ -60,7 +60,7 @@ export const listShifts = async (req, res) => {
           select: {
             id: true,
             name: true,
-            email: true,
+            username: true,
             role: true
           }
         }
@@ -85,7 +85,7 @@ export const getShift = async (req, res) => {
           select: {
             id: true,
             name: true,
-            email: true,
+            username: true,
             telefone: true,
             role: true
           }
@@ -159,7 +159,7 @@ export const createShift = async (req, res) => {
 
       if (conflictingShifts.length > 0) {
         const conflict = conflictingShifts[0];
-        const employeeName = conflict.employee?.name || conflict.employee?.email || 'Funcionário';
+        const employeeName = conflict.employee?.name || conflict.employee?.username || 'Funcionário';
         return res.status(400).json({ 
           error: `${employeeName} já possui um plantão no mesmo horário (${new Date(conflict.start).toLocaleString('pt-BR')} - ${new Date(conflict.end).toLocaleString('pt-BR')})`
         });
@@ -171,14 +171,14 @@ export const createShift = async (req, res) => {
         start: shiftStart,
         end: shiftEnd,
         employeeId: employeeId || null,
-        createdBy: req.user.email
+        createdBy: req.user.username
       },
       include: {
         employee: {
           select: {
             id: true,
             name: true,
-            email: true,
+            username: true,
             role: true
           }
         }
@@ -247,14 +247,14 @@ export const updateShift = async (req, res) => {
         },
         include: {
           employee: {
-            select: { name: true, email: true }
+            select: { name: true, username: true }
           }
         }
       });
 
       if (conflictingShifts.length > 0) {
         const conflict = conflictingShifts[0];
-        const employeeName = conflict.employee?.name || conflict.employee?.email || 'Funcionário';
+        const employeeName = conflict.employee?.name || conflict.employee?.username || 'Funcionário';
         return res.status(400).json({ 
           error: `${employeeName} já possui um plantão no mesmo horário (${new Date(conflict.start).toLocaleString('pt-BR')} - ${new Date(conflict.end).toLocaleString('pt-BR')})`
         });
@@ -269,7 +269,7 @@ export const updateShift = async (req, res) => {
           select: {
             id: true,
             name: true,
-            email: true,
+            username: true,
             role: true
           }
         }
@@ -363,7 +363,7 @@ export const createRecurringShifts = async (req, res) => {
           start: shiftStartTime,
           end: shiftEndTime,
           employeeId: employeeId || null,
-          createdBy: req.user.email
+          createdBy: req.user.username
         });
       }
       
@@ -413,14 +413,14 @@ export const createRecurringShifts = async (req, res) => {
           },
           include: {
             employee: {
-              select: { name: true, email: true }
+              select: { name: true, username: true }
             }
           }
         });
 
         if (conflictingShifts.length > 0) {
           const conflict = conflictingShifts[0];
-          const employeeName = conflict.employee?.name || conflict.employee?.email || 'Funcionário';
+          const employeeName = conflict.employee?.name || conflict.employee?.username || 'Funcionário';
           return res.status(400).json({ 
             error: `${employeeName} já possui um plantão no mesmo horário (${new Date(conflict.start).toLocaleString('pt-BR')} - ${new Date(conflict.end).toLocaleString('pt-BR')}). Não é possível criar plantões duplicados.`
           });

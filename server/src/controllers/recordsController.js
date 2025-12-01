@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-async function createAuditLog(recordId, action, field, oldValue, newValue, userEmail) {
+async function createAuditLog(recordId, action, field, oldValue, newValue, username) {
   await prisma.auditLog.create({
     data: {
       recordId,
@@ -10,7 +10,7 @@ async function createAuditLog(recordId, action, field, oldValue, newValue, userE
       field,
       oldValue: oldValue ? String(oldValue) : null,
       newValue: newValue ? String(newValue) : null,
-      userEmail
+      username
     }
   });
 }
@@ -42,10 +42,10 @@ export const listRecords = async (req, res) => {
       include: {
         med: true,
         deliveredBy: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, username: true }
         },
         receivedBy: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, username: true }
         }
       },
       orderBy: { date: 'desc' }
@@ -66,10 +66,10 @@ export const getRecord = async (req, res) => {
       include: {
         med: true,
         deliveredBy: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, username: true }
         },
         receivedBy: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, username: true }
         },
         auditLogs: {
           orderBy: { createdAt: 'desc' }
@@ -150,12 +150,12 @@ export const createRecord = async (req, res) => {
         deliveredAt: new Date(),
         photoUrl,
         status: 'pendente',
-        createdBy: req.user.email
+        createdBy: req.user.username
       },
       include: {
         med: true,
         deliveredBy: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, username: true }
         }
       }
     });
@@ -167,7 +167,7 @@ export const createRecord = async (req, res) => {
       null,
       null,
       null,
-      req.user.email
+      req.user.username
     );
 
     // Registrar na timeline
@@ -175,11 +175,11 @@ export const createRecord = async (req, res) => {
       data: {
         type: 'record_created',
         userId: req.user.id,
-        userEmail: req.user.email,
-        userName: req.user.name || req.user.email,
+        username: req.user.username,
+        fullName: req.user.name || req.user.username,
         entityType: 'record',
         entityId: record.id,
-        description: `${req.user.name || req.user.email} registrou entrega de ${record.med.name}`,
+        description: `${req.user.name || req.user.username} registrou entrega de ${record.med.name}`,
         metadata: JSON.stringify({ medId, qtyDelivered })
       }
     });
@@ -279,10 +279,10 @@ export const receiveRecord = async (req, res) => {
       include: {
         med: true,
         deliveredBy: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, username: true }
         },
         receivedBy: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, username: true }
         }
       }
     });
@@ -294,7 +294,7 @@ export const receiveRecord = async (req, res) => {
       'qtyReceived',
       null,
       qtyReceived,
-      req.user.email
+      req.user.username
     );
 
     // Registrar na timeline
@@ -302,11 +302,11 @@ export const receiveRecord = async (req, res) => {
       data: {
         type: 'record_received',
         userId: req.user.id,
-        userEmail: req.user.email,
-        userName: req.user.name || req.user.email,
+        username: req.user.username,
+        fullName: req.user.name || req.user.username,
         entityType: 'record',
         entityId: record.id,
-        description: `${req.user.name || req.user.email} confirmou recebimento de ${record.med.name}${status === 'discrepancia' ? ' (com discrepância)' : ''}`,
+        description: `${req.user.name || req.user.username} confirmou recebimento de ${record.med.name}${status === 'discrepancia' ? ' (com discrepância)' : ''}`,
         metadata: JSON.stringify({ qtyReceived, qtyDelivered: existingRecord.qtyDelivered, status })
       }
     });
@@ -340,22 +340,22 @@ export const updateRecord = async (req, res) => {
     // Criar logs de auditoria para cada campo alterado
     if (qtyDelivered !== undefined && qtyDelivered !== existingRecord.qtyDelivered) {
       updateData.qtyDelivered = qtyDelivered;
-      await createAuditLog(id, 'UPDATE', 'qtyDelivered', existingRecord.qtyDelivered, qtyDelivered, req.user.email);
+      await createAuditLog(id, 'UPDATE', 'qtyDelivered', existingRecord.qtyDelivered, qtyDelivered, req.user.username);
     }
 
     if (qtyReceived !== undefined && qtyReceived !== existingRecord.qtyReceived) {
       updateData.qtyReceived = qtyReceived;
-      await createAuditLog(id, 'UPDATE', 'qtyReceived', existingRecord.qtyReceived, qtyReceived, req.user.email);
+      await createAuditLog(id, 'UPDATE', 'qtyReceived', existingRecord.qtyReceived, qtyReceived, req.user.username);
     }
 
     if (status !== undefined && status !== existingRecord.status) {
       updateData.status = status;
-      await createAuditLog(id, 'UPDATE', 'status', existingRecord.status, status, req.user.email);
+      await createAuditLog(id, 'UPDATE', 'status', existingRecord.status, status, req.user.username);
     }
 
     if (photoUrl !== undefined && photoUrl !== existingRecord.photoUrl) {
       updateData.photoUrl = photoUrl;
-      await createAuditLog(id, 'UPDATE', 'photoUrl', existingRecord.photoUrl, photoUrl, req.user.email);
+      await createAuditLog(id, 'UPDATE', 'photoUrl', existingRecord.photoUrl, photoUrl, req.user.username);
     }
 
     const record = await prisma.record.update({
@@ -364,10 +364,10 @@ export const updateRecord = async (req, res) => {
       include: {
         med: true,
         deliveredBy: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, username: true }
         },
         receivedBy: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, username: true }
         }
       }
     });
@@ -396,7 +396,7 @@ export const deleteRecord = async (req, res) => {
     }
 
     // Criar log antes de deletar
-    await createAuditLog(id, 'DELETE', null, JSON.stringify(existingRecord), null, req.user.email);
+    await createAuditLog(id, 'DELETE', null, JSON.stringify(existingRecord), null, req.user.username);
 
     await prisma.record.delete({
       where: { id }
@@ -466,7 +466,7 @@ export const uploadPhoto = async (req, res) => {
       data: { photoUrl }
     });
 
-    await createAuditLog(id, 'UPDATE', 'photoUrl', record.photoUrl, photoUrl, req.user.email);
+    await createAuditLog(id, 'UPDATE', 'photoUrl', record.photoUrl, photoUrl, req.user.username);
 
     res.json({ 
       message: 'Foto enviada com sucesso',

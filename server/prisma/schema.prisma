@@ -12,7 +12,7 @@ datasource db {
 
 model User {
   id                String   @id @default(uuid())
-  email             String   @unique
+  username          String   @unique
   name              String?
   passwordHash      String?
   role              String   // 'farmaceutico' | 'chefe' | 'admin' | 'atendente'
@@ -79,7 +79,7 @@ model AuditLog {
   field     String?
   oldValue  String?
   newValue  String?
-  userEmail String?
+  username  String?
   createdAt DateTime @default(now())
 }
 
@@ -87,8 +87,8 @@ model AuditLog {
 model Absence {
   id          String   @id @default(uuid())
   userId      String
-  userEmail   String
-  userName    String
+  username    String
+  fullName    String
   date        DateTime
   reason      String?  // 'folga', 'ferias', 'atestado', 'outro'
   description String?
@@ -102,10 +102,10 @@ model ShiftSwapRequest {
   shiftId         String
   shiftDate       DateTime
   requesterId     String
-  requesterEmail  String
+  requesterUsername String
   requesterName   String
   targetId        String?
-  targetEmail     String?
+  targetUsername  String?
   targetName      String?
   targetShiftId   String?   // ID do plantão do colega para troca bilateral
   reason          String?
@@ -122,8 +122,8 @@ model ActivityLog {
   id          String   @id @default(uuid())
   type        String   // 'record_created', 'record_received', 'shift_created', 'swap_requested', 'absence_created', etc
   userId      String
-  userEmail   String
-  userName    String
+  username    String
+  fullName    String
   entityType  String?  // 'record', 'shift', 'swap', 'absence', 'user'
   entityId    String?
   description String

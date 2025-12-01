@@ -7,7 +7,7 @@ const SALT_ROUNDS = 10;
 
 export const register = async (req, res) => {
   try {
-    const { email, name, password, role, telefone, telefone_whatsapp } = req.body;
+    const { username, name, password, role, telefone, telefone_whatsapp } = req.body;
 
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Apenas administradores podem criar usuários' });
@@ -19,18 +19,18 @@ export const register = async (req, res) => {
     }
 
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { username }
     });
 
     if (existingUser) {
-      return res.status(400).json({ error: 'Email já cadastrado' });
+      return res.status(400).json({ error: 'Usuário já cadastrado' });
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
     const user = await prisma.user.create({
       data: {
-        email,
+        username,
         name,
         passwordHash,
         role,
@@ -39,7 +39,7 @@ export const register = async (req, res) => {
       },
       select: {
         id: true,
-        email: true,
+        username: true,
         name: true,
         role: true,
         telefone: true,
@@ -55,14 +55,14 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Usuário e senha são obrigatórios' });
     }
 
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { username }
     });
 
     if (!user || !user.active) {
@@ -78,7 +78,7 @@ export const login = async (req, res) => {
     const token = jwt.sign(
       {
         id: user.id,
-        email: user.email,
+        username: user.username,
         role: user.role
       },
       process.env.JWT_SECRET,
@@ -89,7 +89,7 @@ export const login = async (req, res) => {
       token,
       user: {
         id: user.id,
-        email: user.email,
+        username: user.username,
         name: user.name,
         role: user.role,
         firstLogin: user.firstLogin
@@ -106,7 +106,7 @@ export const me = async (req, res) => {
       where: { id: req.user.id },
       select: {
         id: true,
-        email: true,
+        username: true,
         name: true,
         role: true,
         telefone: true,

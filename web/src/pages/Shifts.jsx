@@ -165,8 +165,8 @@ export default function Shifts() {
     try {
       await api.post('/absences', {
         userId: shift.employeeId,
-        userEmail: shift.employee.email,
-        userName: shift.employee.name || shift.employee.email,
+        username: shift.employee.username,
+        fullName: shift.employee.name || shift.employee.username,
         date: shift.start,
         reason: absenceType.toLowerCase(),
         description: description || ''
@@ -298,7 +298,7 @@ export default function Shifts() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h4 className="text-lg font-semibold text-gray-900">
-                          {shift.employee ? shift.employee.name || shift.employee.email : 'Não atribuído'}
+                          {shift.employee ? shift.employee.name || shift.employee.username : 'Não atribuído'}
                         </h4>
                       </div>
                       
@@ -360,7 +360,7 @@ export default function Shifts() {
                   <option value="">Não atribuído</option>
                   {users.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.name || u.email}
+                      {u.name || u.username}
                     </option>
                   ))}
                 </select>
@@ -430,7 +430,7 @@ export default function Shifts() {
                   <option value="">Não atribuído</option>
                   {users.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.name || u.email}
+                      {u.name || u.username}
                     </option>
                   ))}
                 </select>

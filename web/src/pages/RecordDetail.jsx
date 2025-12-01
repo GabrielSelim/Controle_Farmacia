@@ -290,9 +290,9 @@ export default function RecordDetail() {
               <div>
                 <p className="text-sm text-gray-600">Entregue por</p>
                 <p className="font-semibold text-gray-900 mt-1">
-                  {record.deliveredBy?.name || record.deliveredBy?.email}
+                  {record.deliveredBy?.name || record.deliveredBy?.username}
                 </p>
-                <p className="text-sm text-gray-500">{record.deliveredBy?.email}</p>
+                <p className="text-sm text-gray-500">{record.deliveredBy?.username}</p>
               </div>
 
               <div>
@@ -321,9 +321,9 @@ export default function RecordDetail() {
                 <div>
                   <p className="text-sm text-gray-600">Recebido por</p>
                   <p className="font-semibold text-gray-900 mt-1">
-                    {record.receivedBy?.name || record.receivedBy?.email}
+                    {record.receivedBy?.name || record.receivedBy?.username}
                   </p>
-                  <p className="text-sm text-gray-500">{record.receivedBy?.email}</p>
+                  <p className="text-sm text-gray-500">{record.receivedBy?.username}</p>
                 </div>
 
                 <div>
@@ -473,7 +473,7 @@ export default function RecordDetail() {
                       <p className="text-xs text-gray-600">Valor novo: {log.newValue}</p>
                     )}
                     <p className="text-xs text-gray-500 mt-1">
-                      Por: {log.userEmail} em {new Date(log.createdAt).toLocaleString('pt-BR')}
+                      Por: {log.username} em {new Date(log.createdAt).toLocaleString('pt-BR')}
                     </p>
                   </div>
                 ))}
