@@ -28,14 +28,11 @@ export async function sendWhatsApp(phoneWithCountry, apiKey, message) {
     const text = await response.text();
 
     if (!response.ok) {
-      console.error('CallMeBot API error:', text);
       throw new Error(`CallMeBot API returned status ${response.status}`);
     }
 
-    console.log(`WhatsApp message sent to ${cleanPhone} (key hidden)`);
     return { success: true, response: text };
   } catch (error) {
-    console.error('Error sending WhatsApp:', error.message);
     throw error;
   }
 }

@@ -53,7 +53,6 @@ export const listRecords = async (req, res) => {
 
     res.json({ records });
   } catch (error) {
-    console.error('List records error:', error);
     res.status(500).json({ error: 'Erro ao listar registros' });
   }
 };
@@ -84,7 +83,6 @@ export const getRecord = async (req, res) => {
 
     res.json({ record });
   } catch (error) {
-    console.error('Get record error:', error);
     res.status(500).json({ error: 'Erro ao buscar registro' });
   }
 };
@@ -93,14 +91,54 @@ export const createRecord = async (req, res) => {
   try {
     const { medId, shiftStart, shiftEnd, qtyDelivered, photoUrl } = req.body;
 
-    // Apenas farmacêuticos e chefes podem criar registros de entrega
-    if (req.user.role !== 'farmaceutico' && req.user.role !== 'chefe') {
-      return res.status(403).json({ error: 'Apenas farmacêuticos podem registrar entregas' });
+    // Apenas farmacêuticos, chefes e admins podem criar registros de entrega
+    if (req.user.role !== 'farmaceutico' && req.user.role !== 'chefe' && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Apenas farmacêuticos e chefes podem registrar entregas' });
     }
 
     if (!medId || qtyDelivered === undefined) {
       return res.status(400).json({ error: 'Medicamento e quantidade são obrigatórios' });
     }
+
+    // Validação de plantão para farmacêuticos (com margem de 2 horas)
+    if (req.user.role === 'farmaceutico') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      // Buscar plantão do usuário no dia
+      const userShifts = await prisma.shift.findMany({
+        where: {
+          employeeId: req.user.id,
+          start: {
+            gte: today,
+            lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+          }
+        }
+      });
+
+      if (userShifts.length > 0) {
+        // Verificar se está dentro do horário com margem de 2 horas (antes ou depois)
+        const TOLERANCE_HOURS = 2;
+        const TOLERANCE_MS = TOLERANCE_HOURS * 60 * 60 * 1000;
+        
+        const isWithinShift = userShifts.some(shift => {
+          const shiftStart = new Date(shift.start);
+          const shiftEnd = new Date(shift.end);
+          const allowedStart = new Date(shiftStart.getTime() - TOLERANCE_MS);
+          const allowedEnd = new Date(shiftEnd.getTime() + TOLERANCE_MS);
+          
+          return now >= allowedStart && now <= allowedEnd;
+        });
+
+        if (!isWithinShift) {
+          return res.status(403).json({ 
+            error: 'Você só pode criar registros dentro do horário do seu plantão (com tolerância de 2 horas antes ou depois)' 
+          });
+        }
+      }
+      // Se não tem plantão no dia, permite criar (pode ser uma situação excepcional)
+    }
+    // Chefes e admins podem criar a qualquer momento
 
     const record = await prisma.record.create({
       data: {
@@ -148,7 +186,6 @@ export const createRecord = async (req, res) => {
 
     res.status(201).json({ record });
   } catch (error) {
-    console.error('Create record error:', error);
     res.status(500).json({ error: 'Erro ao criar registro' });
   }
 };
@@ -158,13 +195,59 @@ export const receiveRecord = async (req, res) => {
     const { id } = req.params;
     const { qtyReceived, notes } = req.body;
 
-    // Apenas farmacêuticos e chefes podem receber registros
-    if (req.user.role !== 'farmaceutico' && req.user.role !== 'chefe') {
+    // Apenas farmacêuticos, chefes e admins podem receber registros
+    if (req.user.role !== 'farmaceutico' && req.user.role !== 'chefe' && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Apenas farmacêuticos podem receber entregas' });
     }
 
     if (qtyReceived === undefined) {
       return res.status(400).json({ error: 'Quantidade recebida é obrigatória' });
+    }
+
+    // Validar se farmacêutico tem plantão ativo (com 2h de tolerância)
+    // Chefes e admins podem receber a qualquer momento
+    if (req.user.role === 'farmaceutico') {
+      const now = new Date();
+      
+      // Buscar plantões próximos (últimas 24h e próximas 24h)
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const userShifts = await prisma.shift.findMany({
+        where: {
+          employeeId: req.user.id,
+          start: { 
+            gte: yesterday,
+            lte: tomorrow
+          }
+        }
+      });
+
+      if (userShifts.length === 0) {
+        return res.status(403).json({ 
+          error: 'Você precisa ter um plantão agendado para confirmar recebimento' 
+        });
+      }
+
+      const TOLERANCE_MS = 2 * 60 * 60 * 1000; // 2 horas
+      
+      // Verificar se está dentro da janela de recebimento (início do plantão com tolerância)
+      // OU dentro da janela de entrega (fim do plantão com tolerância)
+      const isWithinShiftWindow = userShifts.some(shift => {
+        const shiftStart = new Date(shift.start);
+        const shiftEnd = new Date(shift.end);
+        const allowedStart = new Date(shiftStart.getTime() - TOLERANCE_MS);
+        const allowedEnd = new Date(shiftEnd.getTime() + TOLERANCE_MS);
+        return now >= allowedStart && now <= allowedEnd;
+      });
+
+      if (!isWithinShiftWindow) {
+        return res.status(403).json({ 
+          error: 'Você só pode confirmar recebimento durante a janela de seu plantão (2h antes do início até 2h após o fim)' 
+        });
+      }
     }
 
     const existingRecord = await prisma.record.findUnique({
@@ -230,7 +313,6 @@ export const receiveRecord = async (req, res) => {
 
     res.json({ record });
   } catch (error) {
-    console.error('Receive record error:', error);
     res.status(500).json({ error: 'Erro ao receber registro' });
   }
 };
@@ -292,7 +374,6 @@ export const updateRecord = async (req, res) => {
 
     res.json({ record });
   } catch (error) {
-    console.error('Update record error:', error);
     res.status(500).json({ error: 'Erro ao atualizar registro' });
   }
 };
@@ -323,7 +404,6 @@ export const deleteRecord = async (req, res) => {
 
     res.json({ message: 'Registro deletado com sucesso' });
   } catch (error) {
-    console.error('Delete record error:', error);
     res.status(500).json({ error: 'Erro ao deletar registro' });
   }
 };
@@ -359,7 +439,40 @@ export const getAuditLogs = async (req, res) => {
 
     res.json({ logs });
   } catch (error) {
-    console.error('Get audit logs error:', error);
     res.status(500).json({ error: 'Erro ao buscar logs de auditoria' });
+  }
+};
+
+export const uploadPhoto = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhuma imagem foi enviada' });
+    }
+
+    const record = await prisma.record.findUnique({
+      where: { id }
+    });
+
+    if (!record) {
+      return res.status(404).json({ error: 'Registro não encontrado' });
+    }
+
+    const photoUrl = `/uploads/records/${req.file.filename}`;
+
+    const updatedRecord = await prisma.record.update({
+      where: { id },
+      data: { photoUrl }
+    });
+
+    await createAuditLog(id, 'UPDATE', 'photoUrl', record.photoUrl, photoUrl, req.user.email);
+
+    res.json({ 
+      message: 'Foto enviada com sucesso',
+      photoUrl: photoUrl
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao fazer upload da foto' });
   }
 };

@@ -33,7 +33,6 @@ export const createAbsence = async (req, res) => {
 
     res.status(201).json(absence);
   } catch (error) {
-    console.error('Erro ao criar ausência:', error);
     res.status(500).json({ error: 'Erro ao criar ausência' });
   }
 };
@@ -62,7 +61,6 @@ export const listAbsences = async (req, res) => {
 
     res.json(absences);
   } catch (error) {
-    console.error('Erro ao listar ausências:', error);
     res.status(500).json({ error: 'Erro ao listar ausências' });
   }
 };
@@ -94,7 +92,6 @@ export const deleteAbsence = async (req, res) => {
 
     res.json({ message: 'Ausência removida com sucesso' });
   } catch (error) {
-    console.error('Erro ao deletar ausência:', error);
     res.status(500).json({ error: 'Erro ao deletar ausência' });
   }
 };

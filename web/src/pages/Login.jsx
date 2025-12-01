@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import ChangePasswordModal from '../components/ChangePasswordModal';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const { login, updateUser } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -18,12 +20,36 @@ export default function Login() {
     const result = await login(email, password);
 
     if (result.success) {
-      navigate('/');
+      // Verificar se é primeiro login
+      if (result.user.firstLogin) {
+        setShowPasswordModal(true);
+      } else {
+        // Se for farmacêutico, marcar para mostrar modal no dashboard
+        if (result.user.role === 'farmaceutico') {
+          sessionStorage.setItem('showHandoverModal', 'true');
+        }
+        navigate('/');
+      }
     } else {
       setError(result.error);
     }
 
     setLoading(false);
+  };
+
+  const handlePasswordChanged = () => {
+    // Atualizar o estado do usuário para firstLogin = false
+    const userData = JSON.parse(localStorage.getItem('user'));
+    userData.firstLogin = false;
+    updateUser(userData);
+    setShowPasswordModal(false);
+    
+    // Se for farmacêutico, marcar para mostrar modal no dashboard
+    if (userData.role === 'farmaceutico') {
+      sessionStorage.setItem('showHandoverModal', 'true');
+    }
+    
+    navigate('/');
   };
 
   return (
@@ -87,6 +113,14 @@ export default function Login() {
           </form>
         </div>
       </div>
+
+      {showPasswordModal && (
+        <ChangePasswordModal
+          isFirstLogin={true}
+          onClose={() => {}} // Não permite fechar no primeiro login
+          onSuccess={handlePasswordChanged}
+        />
+      )}
     </div>
   );
 }

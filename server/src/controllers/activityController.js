@@ -30,7 +30,6 @@ export const listActivities = async (req, res) => {
 
     res.json(activities);
   } catch (error) {
-    console.error('Erro ao listar atividades:', error);
     res.status(500).json({ error: 'Erro ao listar atividades' });
   }
 };
@@ -99,7 +98,6 @@ export const getActivityStats = async (req, res) => {
       absencesToday
     });
   } catch (error) {
-    console.error('Erro ao obter estatísticas:', error);
     res.status(500).json({ error: 'Erro ao obter estatísticas' });
   }
 };
@@ -120,6 +118,5 @@ export const logActivity = async (type, userId, userEmail, userName, entityType,
       }
     });
   } catch (error) {
-    console.error('Erro ao registrar atividade:', error);
   }
 };

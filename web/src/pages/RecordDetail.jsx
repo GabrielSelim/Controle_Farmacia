@@ -3,8 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 export default function RecordDetail() {
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, hasRole } = useAuth();
@@ -12,10 +16,67 @@ export default function RecordDetail() {
   const [loading, setLoading] = useState(true);
   const [receiving, setReceiving] = useState(false);
   const [qtyReceived, setQtyReceived] = useState('');
+  const [currentShift, setCurrentShift] = useState(null);
+  const [receivePhotoFile, setReceivePhotoFile] = useState(null);
+  const [receivePhotoPreview, setReceivePhotoPreview] = useState(null);
 
   useEffect(() => {
     loadRecord();
-  }, [id]);
+    if (user?.role === 'farmaceutico') {
+      checkCurrentShift();
+    }
+  }, [id, user]);
+
+  const checkCurrentShift = async () => {
+    try {
+      const now = new Date();
+      
+      // Buscar plantões próximos (hoje, ontem e amanhã)
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      
+      const today = now.toISOString().split('T')[0];
+      
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      
+      // Buscar plantões dos 3 dias
+      const [resYesterday, resToday, resTomorrow] = await Promise.all([
+        api.get('/shifts', { params: { date: yesterdayStr } }).catch(() => ({ data: { shifts: [] } })),
+        api.get('/shifts', { params: { date: today } }).catch(() => ({ data: { shifts: [] } })),
+        api.get('/shifts', { params: { date: tomorrowStr } }).catch(() => ({ data: { shifts: [] } }))
+      ]);
+      
+      const allShifts = [
+        ...(resYesterday.data.shifts || []),
+        ...(resToday.data.shifts || []),
+        ...(resTomorrow.data.shifts || [])
+      ];
+      
+      const myShifts = allShifts.filter(s => s.employeeId === user.id);
+      
+      if (myShifts.length > 0) {
+        const TOLERANCE_MS = 2 * 60 * 60 * 1000; // 2 horas
+        
+        // Verificar se algum plantão está dentro da janela de tolerância
+        const activeShift = myShifts.find(shift => {
+          const shiftStart = new Date(shift.start);
+          const shiftEnd = new Date(shift.end);
+          const allowedStart = new Date(shiftStart.getTime() - TOLERANCE_MS);
+          const allowedEnd = new Date(shiftEnd.getTime() + TOLERANCE_MS);
+          
+          return now >= allowedStart && now <= allowedEnd;
+        });
+        
+        if (activeShift) {
+          setCurrentShift(activeShift);
+        }
+      }
+    } catch (error) {
+    }
+  };
 
   const loadRecord = async () => {
     try {
@@ -24,8 +85,7 @@ export default function RecordDetail() {
       setRecord(res.data.record);
       setQtyReceived(res.data.record.qtyDelivered?.toString() || '');
     } catch (error) {
-      console.error('Erro ao carregar registro:', error);
-      alert('Erro ao carregar registro');
+      toast.error('Erro ao carregar registro');
       navigate('/records');
     } finally {
       setLoading(false);
@@ -33,27 +93,80 @@ export default function RecordDetail() {
   };
 
   const handleReceive = async () => {
-    if (!qtyReceived || qtyReceived === '') {
-      alert('Por favor, informe a quantidade recebida');
+    if (!qtyReceived || qtyReceived <= 0) {
+      toast.warning('Por favor, informe a quantidade recebida');
       return;
     }
 
-    if (!confirm('Confirma o recebimento com esta quantidade?')) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Confirmar Recebimento',
+      message: `Confirma o recebimento de ${qtyReceived} unidades?`,
+      confirmText: 'Confirmar',
+      cancelText: 'Cancelar',
+      confirmColor: 'green'
+    });
+    
+    if (!confirmed) return;
 
     try {
       setReceiving(true);
       await api.post(`/records/${id}/receive`, {
         qtyReceived: parseInt(qtyReceived)
       });
-      alert('✅ Recebimento confirmado com sucesso!');
+
+      // Se houver foto, fazer upload separado
+      if (receivePhotoFile) {
+        const formData = new FormData();
+        formData.append('photo', receivePhotoFile);
+        await api.post(`/records/${id}/upload-photo`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+      }
+
+      toast.success('Recebimento confirmado com sucesso!');
+      setReceivePhotoFile(null);
+      setReceivePhotoPreview(null);
       loadRecord();
     } catch (error) {
-      alert(error.response?.data?.error || 'Erro ao confirmar recebimento');
+      toast.error(error.response?.data?.error || 'Erro ao confirmar recebimento');
     } finally {
       setReceiving(false);
     }
+  };
+
+  const handleReceivePhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Apenas arquivos de imagem são permitidos (JPEG, PNG, GIF, WebP)');
+      return;
+    }
+
+    // Validar tamanho (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      toast.error('A imagem deve ter no máximo 5MB');
+      return;
+    }
+
+    setReceivePhotoFile(file);
+
+    // Criar preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setReceivePhotoPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeReceivePhoto = () => {
+    setReceivePhotoFile(null);
+    setReceivePhotoPreview(null);
   };
 
   const getStatusBadge = (status) => {
@@ -63,6 +176,28 @@ export default function RecordDetail() {
       discrepancia: 'bg-red-100 text-red-800'
     };
     return badges[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const translateAction = (action) => {
+    const translations = {
+      'CREATE': 'Criação',
+      'UPDATE': 'Atualização',
+      'DELETE': 'Exclusão',
+      'RECEIVE': 'Recebimento',
+      'DELIVER': 'Entrega'
+    };
+    return translations[action] || action;
+  };
+
+  const translateField = (field) => {
+    const translations = {
+      'qtyDelivered': 'Quantidade Entregue',
+      'qtyReceived': 'Quantidade Recebida',
+      'status': 'Status',
+      'notes': 'Observações',
+      'photoUrl': 'Foto'
+    };
+    return translations[field] || field;
   };
 
   if (loading) {
@@ -104,7 +239,6 @@ export default function RecordDetail() {
         </div>
 
         <div className="space-y-6">
-          {/* Informações principais */}
           <div className="card">
             <div className="flex justify-between items-start mb-4">
               <h2 className="text-xl font-bold text-gray-900">Informações Gerais</h2>
@@ -150,7 +284,6 @@ export default function RecordDetail() {
             </div>
           </div>
 
-          {/* Entrega */}
           <div className="card">
             <h2 className="text-xl font-bold text-gray-900 mb-4">📦 Entrega</h2>
             <div className="space-y-3">
@@ -180,7 +313,6 @@ export default function RecordDetail() {
             </div>
           </div>
 
-          {/* Recebimento */}
           <div className="card">
             <h2 className="text-xl font-bold text-gray-900 mb-4">✅ Recebimento</h2>
             
@@ -221,47 +353,110 @@ export default function RecordDetail() {
                   ⏳ Aguardando confirmação de recebimento
                 </p>
                 
-                <div className="space-y-4">
-                  <div>
-                    <label className="label">Quantidade Recebida</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={qtyReceived}
-                      onChange={(e) => setQtyReceived(e.target.value)}
-                      className="input max-w-xs"
-                      placeholder="Ex: 10"
-                    />
-                  </div>
+                {/* Mostrar botão apenas se for chefe/admin OU farmacêutico com plantão ativo */}
+                {(user?.role === 'chefe' || user?.role === 'admin' || (user?.role === 'farmaceutico' && currentShift)) ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="label">Quantidade Recebida *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={qtyReceived}
+                        onChange={(e) => setQtyReceived(e.target.value)}
+                        className="input max-w-xs min-h-[44px]"
+                        placeholder="Ex: 10"
+                      />
+                    </div>
 
-                  <button
-                    onClick={handleReceive}
-                    disabled={receiving}
-                    className="btn btn-primary"
-                  >
-                    {receiving ? 'Confirmando...' : '✅ Confirmar Recebimento'}
-                  </button>
-                </div>
+                    {/* Upload de Foto do Recebimento */}
+                    <div>
+                      <label className="label">Foto do Recebimento (opcional)</label>
+                      {!receivePhotoPreview ? (
+                        <div className="mt-2">
+                          <label className="flex flex-col items-center justify-center w-full h-32 sm:h-48 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-500 transition-colors bg-gray-50 hover:bg-gray-100">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                              <svg className="w-8 h-8 sm:w-10 sm:h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                              </svg>
+                              <p className="mb-2 text-xs sm:text-sm text-gray-500">
+                                <span className="font-semibold">Clique para fazer upload</span> ou arraste
+                              </p>
+                              <p className="text-xs text-gray-500">PNG, JPG, GIF, WebP (máx. 5MB)</p>
+                            </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={handleReceivePhotoChange}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="mt-2 relative">
+                          <img 
+                            src={receivePhotoPreview} 
+                            alt="Preview" 
+                            className="w-full max-h-96 object-contain rounded-lg border-2 border-gray-300"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeReceivePhoto}
+                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                          <p className="text-xs text-gray-600 mt-2">
+                            📎 {receivePhotoFile?.name} ({(receivePhotoFile?.size / 1024 / 1024).toFixed(2)}MB)
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={handleReceive}
+                      disabled={receiving}
+                      className="btn btn-primary min-h-[44px]"
+                    >
+                      {receiving ? 'Confirmando...' : '✅ Confirmar Recebimento'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600">
+                    {user?.role === 'farmaceutico' 
+                      ? '⚠️ Você precisa ter um plantão ativo (com 2h de tolerância) para confirmar o recebimento.'
+                      : '⚠️ Você não tem permissão para confirmar recebimentos.'}
+                  </p>
+                )}
               </div>
             )}
           </div>
 
-          {/* Foto */}
           {record.photoUrl && (
             <div className="card">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">📸 Foto</h2>
-              <img
-                src={record.photoUrl}
-                alt="Foto do registro"
-                className="max-w-full rounded-lg"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                }}
-              />
+              <h2 className="text-xl font-bold text-gray-900 mb-4">📸 Foto da Entrega</h2>
+              <div className="relative">
+                <img
+                  src={`http://localhost:3000${record.photoUrl}`}
+                  alt="Foto do registro"
+                  className="w-full max-h-[600px] object-contain rounded-lg border-2 border-gray-200 cursor-pointer hover:border-primary-500 transition-colors"
+                  onClick={(e) => {
+                    // Abrir imagem em nova aba para visualização ampliada
+                    window.open(e.target.src, '_blank');
+                  }}
+                  onError={(e) => {
+                    e.target.parentElement.innerHTML = '<p class="text-gray-500 text-sm">⚠️ Erro ao carregar imagem</p>';
+                  }}
+                />
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  💡 Clique na imagem para ampliar
+                </p>
+              </div>
             </div>
           )}
 
-          {/* Logs de auditoria */}
           {record.auditLogs && record.auditLogs.length > 0 && (
             <div className="card">
               <h2 className="text-xl font-bold text-gray-900 mb-4">📋 Histórico de Alterações</h2>
@@ -269,7 +464,7 @@ export default function RecordDetail() {
                 {record.auditLogs.map((log) => (
                   <div key={log.id} className="border-l-4 border-primary-500 pl-4 py-2">
                     <p className="text-sm font-semibold text-gray-900">
-                      {log.action} {log.field && `- ${log.field}`}
+                      {translateAction(log.action)} {log.field && `- ${translateField(log.field)}`}
                     </p>
                     {log.oldValue && (
                       <p className="text-xs text-gray-600">Valor anterior: {log.oldValue}</p>

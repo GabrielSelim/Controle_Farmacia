@@ -15,11 +15,12 @@ model User {
   email             String   @unique
   name              String?
   passwordHash      String?
-  role              String   // 'farmaceutico' | 'chefe' | 'admin' | 'assistente'
+  role              String   // 'farmaceutico' | 'chefe' | 'admin' | 'atendente'
   telefone          String?  // número formato internacional: 5516799...
   telefone_whatsapp String?  // opcional
   callmebot_key     String?  // armazenar encriptado
   active            Boolean  @default(true)
+  firstLogin        Boolean  @default(true)  // true = precisa trocar senha
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   shifts            Shift[]
@@ -42,7 +43,7 @@ model Shift {
   start            DateTime
   end              DateTime
   employee         User?    @relation(fields: [employeeId], references: [id])
-  employeeId       String?  // pode ser farmaceutico, chefe ou assistente
+  employeeId       String?  // pode ser farmaceutico, chefe ou atendente
   notificationSent Boolean  @default(false)
   createdBy        String?
 }

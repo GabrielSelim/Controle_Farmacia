@@ -15,10 +15,12 @@ export const AuthProvider = ({ children }) => {
       if (token && savedUser) {
         try {
           setUser(JSON.parse(savedUser));
-          // Verificar se o token ainda é válido
-          await api.get('/auth/me');
+          // Verificar se o token ainda é válido e atualizar dados do usuário
+          const response = await api.get('/auth/me');
+          const updatedUser = response.data.user;
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+          setUser(updatedUser);
         } catch (error) {
-          console.error('Token inválido:', error);
           logout();
         }
       }
@@ -37,13 +39,18 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
 
-      return { success: true };
+      return { success: true, user };
     } catch (error) {
       return {
         success: false,
         error: error.response?.data?.error || 'Erro ao fazer login'
       };
     }
+  };
+
+  const updateUser = (updatedUser) => {
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    setUser(updatedUser);
   };
 
   const logout = () => {
@@ -61,7 +68,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, hasRole }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, hasRole, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

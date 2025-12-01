@@ -24,7 +24,6 @@ export const listUsers = async (req, res) => {
 
     res.json({ users });
   } catch (error) {
-    console.error('List users error:', error);
     res.status(500).json({ error: 'Erro ao listar usuários' });
   }
 };
@@ -54,7 +53,6 @@ export const getUser = async (req, res) => {
 
     res.json({ user });
   } catch (error) {
-    console.error('Get user error:', error);
     res.status(500).json({ error: 'Erro ao buscar usuário' });
   }
 };
@@ -113,7 +111,6 @@ export const updateUser = async (req, res) => {
 
     res.json({ user });
   } catch (error) {
-    console.error('Update user error:', error);
     res.status(500).json({ error: 'Erro ao atualizar usuário' });
   }
 };
@@ -138,9 +135,8 @@ export const deleteUser = async (req, res) => {
       data: { active: false }
     });
 
-    res.json({ message: 'Usuário desativado com sucesso' });
+    res.json({ message: 'Usuário deletado com sucesso' });
   } catch (error) {
-    console.error('Delete user error:', error);
     res.status(500).json({ error: 'Erro ao deletar usuário' });
   }
 };

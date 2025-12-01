@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 export default function ShiftSwaps() {
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const { user, hasRole } = useAuth();
   const [swaps, setSwaps] = useState([]);
   const [shifts, setShifts] = useState([]);
@@ -20,6 +24,13 @@ export default function ShiftSwaps() {
   });
   
   const [targetShifts, setTargetShifts] = useState([]);
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
+  
+  // Filtros (apenas para chefe/admin)
+  const [filters, setFilters] = useState({
+    status: 'all',
+    requester: 'all'
+  });
 
   useEffect(() => {
     loadData();
@@ -49,7 +60,6 @@ export default function ShiftSwaps() {
       setShifts(shiftsRes.data.shifts || shiftsRes.data || []);
       setUsers(usersRes.data.users || usersRes.data);
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
     } finally {
       setLoading(false);
     }
@@ -60,7 +70,7 @@ export default function ShiftSwaps() {
     try {
       const shift = shifts.find(s => s.id === formData.shiftId);
       if (!shift) {
-        alert('Plantão não encontrado');
+        toast.error('Plantão não encontrado');
         return;
       }
 
@@ -79,14 +89,13 @@ export default function ShiftSwaps() {
         reason: formData.reason
       });
 
-      alert('Solicitação de troca criada com sucesso!');
+      toast.success('Solicitação de troca criada com sucesso!');
       setShowModal(false);
       setFormData({ shiftId: '', targetId: '', targetShiftId: '', reason: '' });
       setTargetShifts([]);
       loadData();
     } catch (error) {
-      console.error('Erro ao criar solicitação:', error);
-      alert(error.response?.data?.error || 'Erro ao criar solicitação de troca');
+      toast.error(error.response?.data?.error || 'Erro ao criar solicitação de troca');
     }
   };
   
@@ -108,42 +117,51 @@ export default function ShiftSwaps() {
   const handleRespond = async (swapId, status) => {
     try {
       await api.patch(`/swaps/${swapId}/respond`, { status });
-      alert(`Solicitação ${status === 'aceito' ? 'aceita' : 'recusada'} com sucesso!`);
+      toast.success(`Solicitação ${status === 'aceito' ? 'aceita' : 'recusada'} com sucesso!`);
       loadData();
     } catch (error) {
-      console.error('Erro ao responder solicitação:', error);
-      alert('Erro ao responder solicitação');
+      toast.error('Erro ao responder solicitação');
     }
   };
 
   const handleApprove = async (swapId) => {
     try {
       await api.patch(`/swaps/${swapId}/approve`);
-      alert('Troca aprovada e plantão atualizado!');
+      toast.success('Troca aprovada e plantão atualizado!');
       loadData();
     } catch (error) {
-      console.error('Erro ao aprovar troca:', error);
-      alert('Erro ao aprovar troca');
+      toast.error('Erro ao aprovar troca');
     }
   };
 
   const handleCancel = async (swapId) => {
-    if (!confirm('Deseja cancelar esta solicitação?')) return;
+    const confirmed = await confirm({
+      title: 'Cancelar Solicitação',
+      message: 'Tem certeza que deseja cancelar esta solicitação de troca?',
+      confirmText: 'Sim, cancelar',
+      cancelText: 'Não',
+      confirmColor: 'red'
+    });
+    
+    if (!confirmed) return;
     
     try {
       await api.delete(`/swaps/${swapId}`);
-      alert('Solicitação cancelada!');
+      toast.success('Solicitação cancelada!');
       loadData();
     } catch (error) {
-      console.error('Erro ao cancelar:', error);
-      alert('Erro ao cancelar solicitação');
+      toast.error('Erro ao cancelar solicitação');
     }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, approvedBy) => {
+    // Se tem approvedBy mas status é "aceito", considerar como "aprovado"
+    const actualStatus = (status === 'aceito' && approvedBy) ? 'aprovado' : status;
+    
     const badges = {
       pendente: 'bg-yellow-100 text-yellow-800',
       aceito: 'bg-green-100 text-green-800',
+      aprovado: 'bg-blue-100 text-blue-800',
       recusado: 'bg-red-100 text-red-800',
       cancelado: 'bg-gray-100 text-gray-800'
     };
@@ -151,13 +169,14 @@ export default function ShiftSwaps() {
     const labels = {
       pendente: 'Pendente',
       aceito: 'Aceito (Aguardando Aprovação)',
+      aprovado: 'Aprovado ✓',
       recusado: 'Recusado',
       cancelado: 'Cancelado'
     };
 
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${badges[status]}`}>
-        {labels[status]}
+      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${badges[actualStatus]}`}>
+        {labels[actualStatus]}
       </span>
     );
   };
@@ -174,11 +193,27 @@ export default function ShiftSwaps() {
     return swap.requesterId === user.id && swap.status === 'pendente';
   };
 
+  // Filtrar swaps
+  const getFilteredSwaps = () => {
+    let filtered = [...swaps];
+    
+    if (filters.status !== 'all') {
+      filtered = filtered.filter(swap => swap.status === filters.status);
+    }
+    
+    if (filters.requester !== 'all') {
+      filtered = filtered.filter(swap => swap.requesterId === filters.requester);
+    }
+    
+    return filtered;
+  };
+
   // Paginação
+  const filteredSwaps = getFilteredSwaps();
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = swaps.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(swaps.length / itemsPerPage);
+  const currentItems = filteredSwaps.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredSwaps.length / itemsPerPage);
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
@@ -202,13 +237,126 @@ export default function ShiftSwaps() {
           </button>
         </div>
 
+        {hasRole(['chefe', 'admin']) && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm border border-blue-100 p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                <h3 className="text-base font-bold text-gray-800">Filtros</h3>
+              </div>
+              <div className="flex items-center gap-2">
+              {(filters.status !== 'all' || filters.requester !== 'all') && (
+                <button
+                  onClick={() => {
+                    setFilters({ status: 'all', requester: 'all' });
+                    setCurrentPage(1);
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-700 hover:text-blue-800 bg-white hover:bg-blue-50 rounded-lg font-medium transition-colors border border-blue-200"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Limpar
+                </button>
+              )}
+              <button
+                onClick={() => setFiltersExpanded(!filtersExpanded)}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-blue-700 hover:text-blue-800 bg-white hover:bg-blue-50 rounded-lg font-medium transition-colors border border-blue-200 min-h-[44px]"
+              >
+                {filtersExpanded ? (
+                  <>
+                    <span className="hidden sm:inline">Minimizar</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                  </>
+                ) : (
+                  <>
+                    <span className="hidden sm:inline">Expandir</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </>
+                )}
+              </button>
+              </div>
+            </div>
+            
+            {filtersExpanded && (
+            <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Status da Solicitação
+                </label>
+                <select
+                  value={filters.status}
+                  onChange={(e) => {
+                    setFilters({ ...filters, status: e.target.value });
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-4 py-2.5 rounded-lg border-2 border-gray-200 bg-white shadow-sm hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-gray-700 font-medium"
+                >
+                  <option value="all">📋 Todos os status</option>
+                  <option value="pendente">⏳ Pendente</option>
+                  <option value="aceito">✓ Aceito (Aguardando Aprovação)</option>
+                  <option value="aprovado">✅ Aprovado</option>
+                  <option value="recusado">❌ Recusado</option>
+                  <option value="cancelado">🚫 Cancelado</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  Funcionário Solicitante
+                </label>
+                <select
+                  value={filters.requester}
+                  onChange={(e) => {
+                    setFilters({ ...filters, requester: e.target.value });
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-4 py-2.5 rounded-lg border-2 border-gray-200 bg-white shadow-sm hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-gray-700 font-medium"
+                >
+                  <option value="all">👥 Todos os funcionários</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.name || u.email} • {u.role === 'farmaceutico' ? '💊 Farmacêutico' : u.role === 'chefe' ? '👔 Chefe' : u.role === 'admin' ? '⚙️ Admin' : u.role}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            {(filters.status !== 'all' || filters.requester !== 'all') && (
+              <div className="mt-4 pt-4 border-t border-blue-200">
+                <p className="text-sm text-blue-700 font-medium">
+                  🔍 Mostrando {filteredSwaps.length} resultado{filteredSwaps.length !== 1 ? 's' : ''} filtrado{filteredSwaps.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            )}
+            </>
+            )}
+          </div>
+        )}
+
         {/* Lista de Solicitações */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           {loading ? (
             <div className="p-8 text-center text-gray-500">Carregando...</div>
-          ) : swaps.length === 0 ? (
+          ) : filteredSwaps.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              Nenhuma solicitação de troca encontrada
+              {filters.status !== 'all' || filters.requester !== 'all' 
+                ? 'Nenhuma solicitação encontrada com os filtros aplicados'
+                : 'Nenhuma solicitação de troca encontrada'}
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
@@ -217,7 +365,7 @@ export default function ShiftSwaps() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        {getStatusBadge(swap.status)}
+                        {getStatusBadge(swap.status, swap.approvedBy)}
                         <span className="text-sm text-gray-500">
                           {new Date(swap.shiftDate).toLocaleDateString('pt-BR', {
                             weekday: 'long',
@@ -280,7 +428,6 @@ export default function ShiftSwaps() {
                       </div>
                     </div>
 
-                    {/* Ações */}
                     <div className="flex gap-2 ml-4">
                       {canRespond(swap) && (
                         <>
@@ -321,7 +468,6 @@ export default function ShiftSwaps() {
                 </div>
               ))}
               
-              {/* Paginação */}
               {totalPages > 1 && (
                 <div className="border-t border-gray-200 px-6 py-4">
                 <div className="flex items-center justify-between">
@@ -379,7 +525,6 @@ export default function ShiftSwaps() {
         </div>
       </div>
 
-      {/* Modal de Criar Solicitação */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -399,8 +544,8 @@ export default function ShiftSwaps() {
                   <option value="">Selecione um plantão</option>
                   {shifts
                     .filter(s => {
-                      // Se for assistente, só pode ver seus próprios plantões
-                      if (user.role === 'assistente') {
+                      // Se for atendente, só pode ver seus próprios plantões
+                      if (user.role === 'atendente') {
                         return s.employeeId === user.id && new Date(s.start) > new Date();
                       }
                       // Senão, pode ver plantões atribuídos a ele (se tiver employeeId)
@@ -429,9 +574,9 @@ export default function ShiftSwaps() {
                     .filter(u => {
                       if (u.id === user.id || !u.active) return false;
                       
-                      // Assistente: só pode trocar com outros assistentes
-                      if (user.role === 'assistente') {
-                        return u.role === 'assistente';
+                      // Atendente: só pode trocar com outros atendentes
+                      if (user.role === 'atendente') {
+                        return u.role === 'atendente';
                       }
                       
                       // Chefe: só pode trocar com farmacêuticos e outros chefes

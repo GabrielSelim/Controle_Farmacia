@@ -11,6 +11,7 @@ export default function Records() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [filters, setFilters] = useState({
     medId: '',
     status: '',
@@ -28,7 +29,6 @@ export default function Records() {
       const res = await api.get('/meds');
       setMeds(res.data.meds || []);
     } catch (error) {
-      console.error('Erro ao carregar medicamentos:', error);
     }
   };
 
@@ -44,7 +44,6 @@ export default function Records() {
       const res = await api.get('/records', { params });
       setRecords(res.data.records || []);
     } catch (error) {
-      console.error('Erro ao carregar registros:', error);
     } finally {
       setLoading(false);
     }
@@ -93,21 +92,44 @@ export default function Records() {
   return (
     <>
       <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Registros de Contagem</h1>
-            <p className="text-gray-600 mt-1">Histórico de entregas e recebimentos</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Registros de Contagem</h1>
+            <p className="text-sm sm:text-base text-gray-600 mt-1">Histórico de entregas e recebimentos</p>
           </div>
-          <Link to="/records/new" className="btn btn-primary">
+          <Link to="/records/new" className="btn btn-primary min-h-[44px] whitespace-nowrap">
             ➕ Novo Registro
           </Link>
         </div>
 
-        {/* Filtros */}
         <div className="card mb-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Filtros</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Filtros</h3>
+            <button
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors min-h-[44px] px-3"
+            >
+              {filtersExpanded ? (
+                <>
+                  <span className="hidden sm:inline">Minimizar</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                </>
+              ) : (
+                <>
+                  <span className="hidden sm:inline">Expandir</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </>
+              )}
+            </button>
+          </div>
+          {filtersExpanded && (
+            <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="label">Medicamento</label>
               <select
@@ -163,18 +185,19 @@ export default function Records() {
             </div>
           </div>
 
-          <div className="flex gap-2 mt-4">
-            <button onClick={applyFilters} className="btn btn-primary">
+          <div className="flex flex-col sm:flex-row gap-2 mt-4">
+            <button onClick={applyFilters} className="btn btn-primary min-h-[44px]">
               Aplicar Filtros
             </button>
-            <button onClick={clearFilters} className="btn btn-secondary">
+            <button onClick={clearFilters} className="btn btn-secondary min-h-[44px]">
               Limpar
             </button>
           </div>
+            </>
+          )}
         </div>
 
-        {/* Tabela de registros */}
-        <div className="card overflow-x-auto">
+        <div className="card">
           {loading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
@@ -185,85 +208,153 @@ export default function Records() {
             </div>
           ) : (
             <>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Data</th>
-                    <th>Medicamento</th>
-                    <th>Entregue por</th>
-                    <th>Recebido por</th>
-                    <th>Quantidade</th>
-                    <th>Status</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {currentItems.map((record) => (
-                    <tr key={record.id}>
-                      <td>
-                        {new Date(record.date).toLocaleDateString('pt-BR')}
-                        <br />
-                        <span className="text-xs text-gray-500">
-                          {new Date(record.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="font-medium">{record.med?.name}</div>
-                        <div className="text-xs text-gray-500">{record.med?.code}</div>
-                      </td>
-                      <td>
-                        {record.deliveredBy?.name || record.deliveredBy?.email || '-'}
-                        <br />
-                        {record.deliveredAt && (
-                          <span className="text-xs text-gray-500">
-                            {new Date(record.deliveredAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {record.receivedBy?.name || record.receivedBy?.email || '-'}
-                        <br />
-                        {record.receivedAt && (
-                          <span className="text-xs text-gray-500">
-                            {new Date(record.receivedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <div>📦 {record.qtyDelivered} {record.med?.unit}</div>
-                        {record.qtyReceived !== null && record.qtyReceived !== undefined && (
-                          <div className="text-sm">✅ {record.qtyReceived} {record.med?.unit}</div>
-                        )}
-                      </td>
-                      <td>
-                        <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadge(record.status)}`}>
-                          {record.status}
-                        </span>
-                      </td>
-                      <td>
-                        <Link
-                          to={`/records/${record.id}`}
-                          className="text-primary-600 hover:text-primary-700 text-sm"
-                        >
-                          Ver detalhes
-                        </Link>
-                      </td>
+              <div className="hidden md:block overflow-x-auto">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Medicamento</th>
+                      <th>Entregue por</th>
+                      <th>Recebido por</th>
+                      <th>Quantidade</th>
+                      <th>Status</th>
+                      <th>Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {currentItems.map((record) => (
+                      <tr key={record.id}>
+                        <td>
+                          {new Date(record.date).toLocaleDateString('pt-BR')}
+                          <br />
+                          <span className="text-xs text-gray-500">
+                            {new Date(record.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="font-medium">{record.med?.name}</div>
+                          <div className="text-xs text-gray-500">{record.med?.code}</div>
+                        </td>
+                        <td>
+                          {record.deliveredBy?.name || record.deliveredBy?.email || '-'}
+                          <br />
+                          {record.deliveredAt && (
+                            <span className="text-xs text-gray-500">
+                              {new Date(record.deliveredAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {record.receivedBy?.name || record.receivedBy?.email || '-'}
+                          <br />
+                          {record.receivedAt && (
+                            <span className="text-xs text-gray-500">
+                              {new Date(record.receivedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <div>📦 {record.qtyDelivered} {record.med?.unit}</div>
+                          {record.qtyReceived !== null && record.qtyReceived !== undefined && (
+                            <div className="text-sm">✅ {record.qtyReceived} {record.med?.unit}</div>
+                          )}
+                        </td>
+                        <td>
+                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadge(record.status)}`}>
+                            {record.status}
+                          </span>
+                        </td>
+                        <td>
+                          <Link
+                            to={`/records/${record.id}`}
+                            className="text-primary-600 hover:text-primary-700 text-sm"
+                          >
+                            Ver detalhes
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-              {/* Paginação */}
+              <div className="md:hidden space-y-4">
+                {currentItems.map((record) => (
+                  <div key={record.id} className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 text-base truncate">{record.med?.name}</h3>
+                        <p className="text-xs text-gray-500">{record.med?.code}</p>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full ml-2 whitespace-nowrap ${getStatusBadge(record.status)}`}>
+                        {record.status}
+                      </span>
+                    </div>
+
+                    <div className="mb-3 pb-3 border-b border-gray-100">
+                      <p className="text-sm text-gray-600">
+                        📅 {new Date(record.date).toLocaleDateString('pt-BR')} às {new Date(record.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+
+                    <div className="mb-3 space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Entregue:</span>
+                        <span className="font-medium">📦 {record.qtyDelivered} {record.med?.unit}</span>
+                      </div>
+                      {record.qtyReceived !== null && record.qtyReceived !== undefined && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Recebido:</span>
+                          <span className="font-medium">✅ {record.qtyReceived} {record.med?.unit}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mb-3 space-y-2 text-sm">
+                      <div>
+                        <span className="text-gray-600">Entregue por:</span>
+                        <p className="font-medium text-gray-900 truncate">
+                          {record.deliveredBy?.name || record.deliveredBy?.email || '-'}
+                        </p>
+                        {record.deliveredAt && (
+                          <p className="text-xs text-gray-500">
+                            às {new Date(record.deliveredAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Recebido por:</span>
+                        <p className="font-medium text-gray-900 truncate">
+                          {record.receivedBy?.name || record.receivedBy?.email || '-'}
+                        </p>
+                        {record.receivedAt && (
+                          <p className="text-xs text-gray-500">
+                            às {new Date(record.receivedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <Link
+                      to={`/records/${record.id}`}
+                      className="block w-full text-center btn btn-secondary min-h-[44px] mt-3"
+                    >
+                      Ver detalhes →
+                    </Link>
+                  </div>
+                ))}
+              </div>
+
               {totalPages > 1 && (
-                <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4">
-                  <div className="text-sm text-gray-700">
+                <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t border-gray-200 pt-4">
+                  <div className="text-xs sm:text-sm text-gray-700 text-center sm:text-left">
                     Mostrando {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, records.length)} de {records.length} registros
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 justify-center">
                     <button
                       onClick={() => paginate(currentPage - 1)}
                       disabled={currentPage === 1}
-                      className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                      className="px-3 py-2 min-h-[44px] border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                     >
                       Anterior
                     </button>
@@ -273,23 +364,22 @@ export default function Records() {
                       <>
                         <button
                           onClick={() => paginate(1)}
-                          className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                          className="px-3 py-2 min-h-[44px] border border-gray-300 rounded-md text-sm hover:bg-gray-50"
                         >
                           1
                         </button>
                         {currentPage > 3 && <span className="px-2 py-1">...</span>}
                       </>
-                    )}
+                  )}
 
-                    {/* Páginas ao redor da atual */}
-                    {[...Array(totalPages)].map((_, i) => {
+                  {[...Array(totalPages)].map((_, i) => {
                       const page = i + 1;
                       if (page >= currentPage - 1 && page <= currentPage + 1) {
                         return (
                           <button
                             key={page}
                             onClick={() => paginate(page)}
-                            className={`px-3 py-1 border rounded-md text-sm ${
+                            className={`px-3 py-2 min-h-[44px] border rounded-md text-sm ${
                               currentPage === page
                                 ? 'bg-primary-600 text-white border-primary-600'
                                 : 'border-gray-300 hover:bg-gray-50'
@@ -300,15 +390,14 @@ export default function Records() {
                         );
                       }
                       return null;
-                    })}
+                  })}
 
-                    {/* Última página */}
-                    {currentPage < totalPages - 1 && (
+                  {currentPage < totalPages - 1 && (
                       <>
                         {currentPage < totalPages - 2 && <span className="px-2 py-1">...</span>}
                         <button
                           onClick={() => paginate(totalPages)}
-                          className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                          className="px-3 py-2 min-h-[44px] border border-gray-300 rounded-md text-sm hover:bg-gray-50"
                         >
                           {totalPages}
                         </button>
@@ -318,7 +407,7 @@ export default function Records() {
                     <button
                       onClick={() => paginate(currentPage + 1)}
                       disabled={currentPage === totalPages}
-                      className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                      className="px-3 py-2 min-h-[44px] border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                     >
                       Próxima
                     </button>

@@ -7,12 +7,10 @@ export const listShifts = async (req, res) => {
     const { startDate, endDate, date } = req.query;
     const user = req.user;
 
-    console.log('Listando plantões - Query:', { startDate, endDate, date });
-
     const where = {};
     
-    // Se for assistente, só pode ver os próprios plantões
-    if (user.role === 'assistente') {
+    // Se for atendente, só pode ver os próprios plantões
+    if (user.role === 'atendente') {
       where.employeeId = user.id;
     }
     
@@ -23,17 +21,36 @@ export const listShifts = async (req, res) => {
       const dayStart = new Date(year, month - 1, day, 0, 0, 0, 0);
       const dayEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
       
-      console.log('Filtro de data:', { dayStart, dayEnd });
-      
       where.OR = [
         { start: { gte: dayStart, lte: dayEnd } },
         { end: { gte: dayStart, lte: dayEnd } },
         { AND: [{ start: { lte: dayStart } }, { end: { gte: dayEnd } }] }
       ];
     } else if (startDate || endDate) {
-      where.start = {};
-      if (startDate) where.start.gte = new Date(startDate);
-      if (endDate) where.start.lte = new Date(endDate);
+      // Filtrar por período
+      where.OR = [
+        // Plantões que começam no período
+        {
+          start: {
+            ...(startDate && { gte: new Date(startDate) }),
+            ...(endDate && { lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)) })
+          }
+        },
+        // Plantões que terminam no período
+        {
+          end: {
+            ...(startDate && { gte: new Date(startDate) }),
+            ...(endDate && { lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)) })
+          }
+        },
+        // Plantões que atravessam todo o período
+        ...(startDate && endDate ? [{
+          AND: [
+            { start: { lte: new Date(startDate) } },
+            { end: { gte: new Date(new Date(endDate).setHours(23, 59, 59, 999)) } }
+          ]
+        }] : [])
+      ];
     }
 
     const shifts = await prisma.shift.findMany({
@@ -51,11 +68,8 @@ export const listShifts = async (req, res) => {
       orderBy: { start: 'asc' }
     });
 
-    console.log('Plantões encontrados:', shifts.length);
-
     res.json({ shifts });
   } catch (error) {
-    console.error('List shifts error:', error);
     res.status(500).json({ error: 'Erro ao listar plantões' });
   }
 };
@@ -85,7 +99,6 @@ export const getShift = async (req, res) => {
 
     res.json({ shift });
   } catch (error) {
-    console.error('Get shift error:', error);
     res.status(500).json({ error: 'Erro ao buscar plantão' });
   }
 };
@@ -98,10 +111,65 @@ export const createShift = async (req, res) => {
       return res.status(400).json({ error: 'Data de início e fim são obrigatórias' });
     }
 
+    const shiftStart = new Date(start);
+    const shiftEnd = new Date(end);
+
+    // Validar se há conflito de horário para o funcionário
+    if (employeeId) {
+      const conflictingShifts = await prisma.shift.findMany({
+        where: {
+          employeeId: employeeId,
+          OR: [
+            // Caso 1: Plantão existente começa antes e termina depois do novo (engloba)
+            {
+              AND: [
+                { start: { lte: shiftStart } },
+                { end: { gte: shiftEnd } }
+              ]
+            },
+            // Caso 2: Plantão existente começa durante o novo
+            {
+              AND: [
+                { start: { gte: shiftStart } },
+                { start: { lt: shiftEnd } }
+              ]
+            },
+            // Caso 3: Plantão existente termina durante o novo
+            {
+              AND: [
+                { end: { gt: shiftStart } },
+                { end: { lte: shiftEnd } }
+              ]
+            },
+            // Caso 4: Novo plantão engloba o existente completamente
+            {
+              AND: [
+                { start: { gte: shiftStart } },
+                { end: { lte: shiftEnd } }
+              ]
+            }
+          ]
+        },
+        include: {
+          employee: {
+            select: { name: true, email: true }
+          }
+        }
+      });
+
+      if (conflictingShifts.length > 0) {
+        const conflict = conflictingShifts[0];
+        const employeeName = conflict.employee?.name || conflict.employee?.email || 'Funcionário';
+        return res.status(400).json({ 
+          error: `${employeeName} já possui um plantão no mesmo horário (${new Date(conflict.start).toLocaleString('pt-BR')} - ${new Date(conflict.end).toLocaleString('pt-BR')})`
+        });
+      }
+    }
+
     const shift = await prisma.shift.create({
       data: {
-        start: new Date(start),
-        end: new Date(end),
+        start: shiftStart,
+        end: shiftEnd,
         employeeId: employeeId || null,
         createdBy: req.user.email
       },
@@ -119,7 +187,6 @@ export const createShift = async (req, res) => {
 
     res.status(201).json({ shift });
   } catch (error) {
-    console.error('Create shift error:', error);
     res.status(500).json({ error: 'Erro ao criar plantão' });
   }
 };
@@ -135,6 +202,64 @@ export const updateShift = async (req, res) => {
     if (end !== undefined) updateData.end = new Date(end);
     if (employeeId !== undefined) updateData.employeeId = employeeId;
     if (notificationSent !== undefined) updateData.notificationSent = notificationSent;
+
+    // Validar conflitos de horário se estiver alterando funcionário, data ou hora
+    if (employeeId && (start !== undefined || end !== undefined)) {
+      const currentShift = await prisma.shift.findUnique({ where: { id } });
+      
+      const shiftStart = start ? new Date(start) : currentShift.start;
+      const shiftEnd = end ? new Date(end) : currentShift.end;
+
+      const conflictingShifts = await prisma.shift.findMany({
+        where: {
+          id: { not: id }, // Excluir o próprio plantão da verificação
+          employeeId: employeeId,
+          OR: [
+            // Caso 1: Plantão existente começa antes e termina depois do novo (engloba)
+            {
+              AND: [
+                { start: { lte: shiftStart } },
+                { end: { gte: shiftEnd } }
+              ]
+            },
+            // Caso 2: Plantão existente começa durante o novo
+            {
+              AND: [
+                { start: { gte: shiftStart } },
+                { start: { lt: shiftEnd } }
+              ]
+            },
+            // Caso 3: Plantão existente termina durante o novo
+            {
+              AND: [
+                { end: { gt: shiftStart } },
+                { end: { lte: shiftEnd } }
+              ]
+            },
+            // Caso 4: Novo plantão engloba o existente completamente
+            {
+              AND: [
+                { start: { gte: shiftStart } },
+                { end: { lte: shiftEnd } }
+              ]
+            }
+          ]
+        },
+        include: {
+          employee: {
+            select: { name: true, email: true }
+          }
+        }
+      });
+
+      if (conflictingShifts.length > 0) {
+        const conflict = conflictingShifts[0];
+        const employeeName = conflict.employee?.name || conflict.employee?.email || 'Funcionário';
+        return res.status(400).json({ 
+          error: `${employeeName} já possui um plantão no mesmo horário (${new Date(conflict.start).toLocaleString('pt-BR')} - ${new Date(conflict.end).toLocaleString('pt-BR')})`
+        });
+      }
+    }
 
     const shift = await prisma.shift.update({
       where: { id },
@@ -153,7 +278,6 @@ export const updateShift = async (req, res) => {
 
     res.json({ shift });
   } catch (error) {
-    console.error('Update shift error:', error);
     res.status(500).json({ error: 'Erro ao atualizar plantão' });
   }
 };
@@ -168,7 +292,6 @@ export const deleteShift = async (req, res) => {
 
     res.json({ message: 'Plantão deletado com sucesso' });
   } catch (error) {
-    console.error('Delete shift error:', error);
     res.status(500).json({ error: 'Erro ao deletar plantão' });
   }
 };
@@ -185,8 +308,6 @@ export const createRecurringShifts = async (req, res) => {
       shiftEnd,   // hora de fim (ex: '20:00')
       customDays  // para pattern 'custom': [0,1,2,3,4] (dom a sáb)
     } = req.body;
-
-    console.log('Dados recebidos:', { employeeId, pattern, startDate, endDate, shiftStart, shiftEnd, customDays });
 
     if (!shiftStart || !shiftEnd) {
       return res.status(400).json({ error: 'Horários de início e fim são obrigatórios' });
@@ -238,8 +359,6 @@ export const createRecurringShifts = async (req, res) => {
           shiftEndTime.setDate(shiftEndTime.getDate() + 1);
         }
         
-        console.log('Criando plantão:', { start: shiftStartTime, end: shiftEndTime, employeeId });
-        
         shifts.push({
           start: shiftStartTime,
           end: shiftEndTime,
@@ -255,21 +374,70 @@ export const createRecurringShifts = async (req, res) => {
       return res.status(400).json({ error: 'Nenhum plantão seria criado com esses parâmetros' });
     }
 
-    console.log('Total de plantões a criar:', shifts.length);
+    // Validar conflitos antes de criar
+    if (employeeId) {
+      for (const shift of shifts) {
+        const conflictingShifts = await prisma.shift.findMany({
+          where: {
+            employeeId: employeeId,
+            OR: [
+              // Caso 1: Plantão existente começa antes e termina depois do novo (engloba)
+              {
+                AND: [
+                  { start: { lte: shift.start } },
+                  { end: { gte: shift.end } }
+                ]
+              },
+              // Caso 2: Plantão existente começa durante o novo
+              {
+                AND: [
+                  { start: { gte: shift.start } },
+                  { start: { lt: shift.end } }
+                ]
+              },
+              // Caso 3: Plantão existente termina durante o novo
+              {
+                AND: [
+                  { end: { gt: shift.start } },
+                  { end: { lte: shift.end } }
+                ]
+              },
+              // Caso 4: Novo plantão engloba o existente completamente
+              {
+                AND: [
+                  { start: { gte: shift.start } },
+                  { end: { lte: shift.end } }
+                ]
+              }
+            ]
+          },
+          include: {
+            employee: {
+              select: { name: true, email: true }
+            }
+          }
+        });
+
+        if (conflictingShifts.length > 0) {
+          const conflict = conflictingShifts[0];
+          const employeeName = conflict.employee?.name || conflict.employee?.email || 'Funcionário';
+          return res.status(400).json({ 
+            error: `${employeeName} já possui um plantão no mesmo horário (${new Date(conflict.start).toLocaleString('pt-BR')} - ${new Date(conflict.end).toLocaleString('pt-BR')}). Não é possível criar plantões duplicados.`
+          });
+        }
+      }
+    }
 
     // Criar todos os plantões
     await prisma.shift.createMany({
       data: shifts
     });
     
-    console.log('Plantões criados com sucesso');
-    
     res.json({ 
       message: `${shifts.length} plantão${shifts.length > 1 ? 'ões' : ''} criado${shifts.length > 1 ? 's' : ''} com sucesso`,
       count: shifts.length 
     });
   } catch (error) {
-    console.error('Create recurring shifts error:', error);
     res.status(500).json({ error: 'Erro ao criar plantões recorrentes' });
   }
 };

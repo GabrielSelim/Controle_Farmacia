@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
+import { useToast } from '../components/Toast';
+import { useConfirm } from '../components/ConfirmDialog';
 
 export default function Shifts() {
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const { user, hasRole } = useAuth();
   const [shifts, setShifts] = useState([]);
   const [users, setUsers] = useState([]);
@@ -22,11 +26,13 @@ export default function Shifts() {
     startDate: '',
     shiftStart: '19:00',
     shiftEnd: '07:00',
-    customDays: []
+    customDays: [],
+    durationDays: 30,
+    durationType: 'days' // 'days' ou 'month'
   });
 
   const isChefOrAdmin = hasRole(['chefe', 'admin']);
-  const isAssistant = user?.role === 'assistente';
+  const isAssistant = user?.role === 'atendente';
 
   useEffect(() => {
     loadData();
@@ -42,18 +48,13 @@ export default function Shifts() {
       
       // Carregar usuários apenas se for chefe ou admin
       if (user && (user.role === 'chefe' || user.role === 'admin')) {
-        console.log('Carregando usuários...', user.role);
         const usersRes = await api.get('/users');
-        console.log('Resposta de usuários:', usersRes.data);
         const allUsers = usersRes.data.users || usersRes.data;
         const filteredUsers = allUsers.filter(u => u.role !== 'admin' && u.active);
-        console.log('Usuários filtrados:', filteredUsers);
         setUsers(filteredUsers);
       } else {
-        console.log('Não carregou usuários. User:', user);
       }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
     } finally {
       setLoading(false);
     }
@@ -63,32 +64,42 @@ export default function Shifts() {
     e.preventDefault();
     try {
       await api.post('/shifts', formData);
-      alert('Plantão criado com sucesso!');
+      toast.success('Plantão criado com sucesso!');
       setShowModal(false);
       setFormData({ employeeId: '', start: '', end: '' });
       loadData();
     } catch (error) {
-      console.error('Erro ao criar plantão:', error);
-      alert('Erro ao criar plantão');
+      toast.error('Erro ao criar plantão');
     }
   };
 
   const handleRecurringSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Calcular data final automaticamente (90 dias após a data inicial)
+      let endDate;
       const startDate = new Date(recurringData.startDate);
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + 90);
+      
+      if (recurringData.durationType === 'month') {
+        // Criar plantões para o mês inteiro
+        endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0); // Último dia do mês
+      } else {
+        // Criar plantões por X dias
+        endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + parseInt(recurringData.durationDays));
+      }
       
       const dataToSend = {
-        ...recurringData,
-        endDate: endDate.toISOString().split('T')[0]
+        employeeId: recurringData.employeeId,
+        pattern: recurringData.pattern,
+        startDate: recurringData.startDate,
+        endDate: endDate.toISOString().split('T')[0],
+        shiftStart: recurringData.shiftStart,
+        shiftEnd: recurringData.shiftEnd,
+        customDays: recurringData.customDays
       };
       
-      console.log('Enviando dados:', dataToSend);
       const response = await api.post('/shifts/recurring', dataToSend);
-      alert(response.data.message);
+      toast.success(response.data.message);
       setShowRecurringModal(false);
       setRecurringData({
         employeeId: '',
@@ -96,52 +107,58 @@ export default function Shifts() {
         startDate: '',
         shiftStart: '19:00',
         shiftEnd: '07:00',
-        customDays: []
+        customDays: [],
+        durationDays: 30,
+        durationType: 'days'
       });
       loadData();
     } catch (error) {
-      console.error('Erro ao criar plantões recorrentes:', error);
-      console.error('Resposta do erro:', error.response?.data);
-      alert(error.response?.data?.error || 'Erro ao criar plantões recorrentes');
+      toast.error(error.response?.data?.error || 'Erro ao criar plantões recorrentes');
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Deseja realmente deletar este plantão?')) return;
+  const handleDelete = async (shiftId) => {
+    const confirmed = await confirm({
+      title: 'Deletar Plantão',
+      message: 'Tem certeza que deseja deletar este plantão? Esta ação não pode ser desfeita.',
+      confirmText: 'Deletar',
+      cancelText: 'Cancelar',
+      confirmColor: 'red'
+    });
+    
+    if (!confirmed) return;
     
     try {
-      await api.delete(`/shifts/${id}`);
-      alert('Plantão deletado com sucesso!');
+      await api.delete(`/shifts/${shiftId}`);
+      toast.success('Plantão deletado com sucesso!');
       loadData();
     } catch (error) {
-      console.error('Erro ao deletar plantão:', error);
-      alert('Erro ao deletar plantão');
+      toast.error('Erro ao deletar plantão');
     }
   };
 
   const handleSendNotification = async (shift) => {
     try {
       await api.post('/notify/shift', { shiftId: shift.id });
-      alert('Notificação enviada com sucesso!');
+      toast.success('Notificação enviada com sucesso!');
       await api.put(`/shifts/${shift.id}`, { notificationSent: true });
       loadData();
     } catch (error) {
-      console.error('Erro ao enviar notificação:', error);
-      alert('Erro ao enviar notificação');
+      toast.error('Erro ao enviar notificação');
     }
   };
 
   const handleMarkAbsence = async (shift) => {
     const absenceType = prompt('Digite o tipo de ausência:\n- falta\n- folga\n- ferias');
     if (!absenceType || !['falta', 'folga', 'ferias'].includes(absenceType.toLowerCase())) {
-      alert('Tipo de ausência inválido. Use: falta, folga ou ferias');
+      toast.error('Tipo de ausência inválido. Use: falta, folga ou ferias');
       return;
     }
 
     const description = prompt('Digite o motivo (opcional):');
     
     if (!shift.employee) {
-      alert('Este plantão não tem funcionário atribuído');
+      toast.error('Este plantão não tem funcionário atribuído');
       return;
     }
 
@@ -154,11 +171,10 @@ export default function Shifts() {
         reason: absenceType.toLowerCase(),
         description: description || ''
       });
-      alert(`${absenceType.charAt(0).toUpperCase() + absenceType.slice(1)} registrada com sucesso!`);
+      toast.success(`${absenceType.charAt(0).toUpperCase() + absenceType.slice(1)} registrada com sucesso!`);
       loadData();
     } catch (error) {
-      console.error('Erro ao registrar ausência:', error);
-      alert(error.response?.data?.error || 'Erro ao registrar ausência');
+      toast.error(error.response?.data?.error || 'Erro ao registrar ausência');
     }
   };
 
@@ -166,7 +182,7 @@ export default function Shifts() {
     const labels = {
       farmaceutico: 'Farmacêutico',
       chefe: 'Farmacêutico (Chefe)',
-      assistente: 'Assistente',
+      atendente: 'Atendente de Farmácia',
       admin: 'Administrador'
     };
     return labels[role] || role;
@@ -261,7 +277,6 @@ export default function Shifts() {
           </div>
         </div>
 
-        {/* Lista de Plantões do Dia */}
         <div className="bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">
@@ -327,7 +342,6 @@ export default function Shifts() {
         </div>
       </div>
 
-      {/* Modal Criar Plantão */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -398,7 +412,6 @@ export default function Shifts() {
         </div>
       )}
 
-      {/* Modal Criar Escala Recorrente */}
       {showRecurringModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
@@ -487,7 +500,40 @@ export default function Shifts() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">A escala será criada por 90 dias a partir desta data</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Duração da Escala
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value={recurringData.durationType}
+                    onChange={(e) => setRecurringData({ ...recurringData, durationType: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="days">Por dias</option>
+                    <option value="month">Mês inteiro</option>
+                  </select>
+                  
+                  {recurringData.durationType === 'days' && (
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={recurringData.durationDays}
+                      onChange={(e) => setRecurringData({ ...recurringData, durationDays: e.target.value })}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Ex: 30"
+                      required
+                    />
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {recurringData.durationType === 'month' 
+                    ? 'Criará plantões para todo o mês da data inicial' 
+                    : `Criará plantões por ${recurringData.durationDays} dias a partir da data inicial`}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -540,10 +586,11 @@ export default function Shifts() {
                       employeeId: '',
                       pattern: '12x36',
                       startDate: '',
-                      endDate: '',
-                      shiftStart: '08:00',
-                      shiftEnd: '20:00',
-                      customDays: []
+                      shiftStart: '19:00',
+                      shiftEnd: '07:00',
+                      customDays: [],
+                      durationDays: 30,
+                      durationType: 'days'
                     });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 hover:bg-gray-300 rounded-lg font-medium transition-colors"

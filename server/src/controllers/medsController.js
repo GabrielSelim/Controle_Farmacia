@@ -10,7 +10,6 @@ export const listMeds = async (req, res) => {
 
     res.json({ meds });
   } catch (error) {
-    console.error('List meds error:', error);
     res.status(500).json({ error: 'Erro ao listar medicamentos' });
   }
 };
@@ -29,7 +28,6 @@ export const getMed = async (req, res) => {
 
     res.json({ med });
   } catch (error) {
-    console.error('Get med error:', error);
     res.status(500).json({ error: 'Erro ao buscar medicamento' });
   }
 };
@@ -62,7 +60,6 @@ export const createMed = async (req, res) => {
 
     res.status(201).json({ med });
   } catch (error) {
-    console.error('Create med error:', error);
     res.status(500).json({ error: 'Erro ao criar medicamento' });
   }
 };
@@ -86,7 +83,6 @@ export const updateMed = async (req, res) => {
 
     res.json({ med });
   } catch (error) {
-    console.error('Update med error:', error);
     res.status(500).json({ error: 'Erro ao atualizar medicamento' });
   }
 };
@@ -101,7 +97,6 @@ export const deleteMed = async (req, res) => {
 
     res.json({ message: 'Medicamento deletado com sucesso' });
   } catch (error) {
-    console.error('Delete med error:', error);
     res.status(500).json({ error: 'Erro ao deletar medicamento' });
   }
 };

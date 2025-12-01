@@ -27,7 +27,6 @@ export const sendWhatsAppNotification = async (req, res) => {
       result 
     });
   } catch (error) {
-    console.error('Send WhatsApp error:', error);
     res.status(500).json({ error: error.message || 'Erro ao enviar WhatsApp' });
   }
 };
@@ -54,7 +53,6 @@ export const scheduleCalendarEvent = async (req, res) => {
       result 
     });
   } catch (error) {
-    console.error('Schedule calendar error:', error);
     res.status(500).json({ error: 'Erro ao criar evento no calendário' });
   }
 };
@@ -88,11 +86,10 @@ export const notifyShift = async (req, res) => {
       try {
         await sendWhatsAppToUserByEmail(shift.pharmacist.email, message);
       } catch (error) {
-        console.error('Error sending WhatsApp to pharmacist:', error);
       }
     }
 
-    // Enviar para assistentes
+    // Enviar para atendentes
     if (shift.assistants) {
       const assistantEmails = shift.assistants.split(';').map(e => e.trim());
       
@@ -100,7 +97,6 @@ export const notifyShift = async (req, res) => {
         try {
           await sendWhatsAppToUserByEmail(email, message);
         } catch (error) {
-          console.error(`Error sending WhatsApp to ${email}:`, error);
         }
       }
     }
@@ -116,7 +112,6 @@ export const notifyShift = async (req, res) => {
       message: 'Notificações enviadas com sucesso'
     });
   } catch (error) {
-    console.error('Notify shift error:', error);
     res.status(500).json({ error: 'Erro ao enviar notificações do plantão' });
   }
 };

@@ -11,7 +11,6 @@
 
 export async function createCalendarEvent(eventData) {
   // Placeholder implementation
-  console.log('Calendar event would be created:', eventData);
   
   /*
   // Implementação real com googleapis:
@@ -69,7 +68,6 @@ export async function createCalendarEvent(eventData) {
 }
 
 export async function listCalendarEvents(startDate, endDate) {
-  console.log('List calendar events:', { startDate, endDate });
   return {
     success: true,
     message: 'Calendar integration not fully implemented yet'

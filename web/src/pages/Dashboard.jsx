@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
+import ShiftHandoverModal from '../components/ShiftHandoverModal';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const [showHandoverModal, setShowHandoverModal] = useState(false);
   const [stats, setStats] = useState({
     pendingDeliveries: 0,
     pendingReceipts: 0,
@@ -18,14 +20,21 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+    
+    // Verificar se deve mostrar o modal de handover para farmacêuticos
+    const shouldShowHandover = sessionStorage.getItem('showHandoverModal');
+    if (shouldShowHandover === 'true' && user?.role === 'farmaceutico') {
+      setShowHandoverModal(true);
+      sessionStorage.removeItem('showHandoverModal');
+    }
+  }, [user]);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
 
-      // Para assistentes, mostrar apenas plantões do dia
-      if (user?.role === 'assistente') {
+      // Para atendentes, mostrar apenas plantões do dia
+      if (user?.role === 'atendente') {
         const today = new Date().toISOString().split('T')[0];
         
         // Carregar plantões de hoje
@@ -42,7 +51,7 @@ export default function Dashboard() {
           new Date(s.end) >= now
         );
         
-        // Encontrar o plantão do assistente hoje
+        // Encontrar o plantão do atendente hoje
         const myShift = todayShifts.find(s => s.employeeId === user.id);
         
         // Filtrar colegas que trabalham no mesmo horário
@@ -61,7 +70,6 @@ export default function Dashboard() {
           });
           pendingSwaps = swapsRes.data.length || 0;
         } catch (err) {
-          console.log('Erro ao carregar swaps:', err);
         }
 
         setStats({
@@ -119,7 +127,6 @@ export default function Dashboard() {
           });
           pendingSwaps = swapsRes.data.length || 0;
         } catch (err) {
-          console.log('Erro ao carregar swaps:', err);
         }
 
         setStats({
@@ -144,7 +151,6 @@ export default function Dashboard() {
         setUpcomingShifts(myUpcomingShifts);
       }
     } catch (error) {
-      console.error('Erro ao carregar dashboard:', error);
     } finally {
       setLoading(false);
     }
@@ -183,16 +189,15 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Cards de estatísticas */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {stats.onDutyNow && (
             <div className="card bg-gradient-to-br from-green-50 to-green-100 border border-green-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-green-800">Status do Plantão</p>
-                  <p className="text-lg font-bold text-green-900 mt-2">🟢 Em Plantão Agora</p>
+                  <p className="text-xs sm:text-sm font-medium text-green-800">Status do Plantão</p>
+                  <p className="text-base sm:text-lg font-bold text-green-900 mt-1 sm:mt-2">🟢 Em Plantão Agora</p>
                 </div>
-                <div className="text-4xl">🏥</div>
+                <div className="text-3xl sm:text-4xl">🏥</div>
               </div>
             </div>
           )}
@@ -201,21 +206,21 @@ export default function Dashboard() {
             <>
               <div className="card bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-yellow-800">Aguardando Recebimento</p>
-                    <p className="text-3xl font-bold text-yellow-900 mt-2">{stats.pendingReceipts}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-yellow-800 truncate">Aguardando Recebimento</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-yellow-900 mt-1 sm:mt-2">{stats.pendingReceipts}</p>
                   </div>
-                  <div className="text-4xl">📦</div>
+                  <div className="text-3xl sm:text-4xl ml-2">📦</div>
                 </div>
               </div>
 
               <div className="card bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-blue-800">Minhas Entregas Pendentes</p>
-                    <p className="text-3xl font-bold text-blue-900 mt-2">{stats.pendingDeliveries}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-blue-800 truncate">Minhas Entregas Pendentes</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-1 sm:mt-2">{stats.pendingDeliveries}</p>
                   </div>
-                  <div className="text-4xl">⏳</div>
+                  <div className="text-3xl sm:text-4xl ml-2">⏳</div>
                 </div>
               </div>
             </>
@@ -223,31 +228,30 @@ export default function Dashboard() {
 
           <div className="card bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-800">Trocas Pendentes</p>
-                <p className="text-3xl font-bold text-purple-900 mt-2">{stats.pendingSwaps}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-purple-800 truncate">Trocas Pendentes</p>
+                <p className="text-2xl sm:text-3xl font-bold text-purple-900 mt-1 sm:mt-2">{stats.pendingSwaps}</p>
               </div>
-              <div className="text-4xl">🔄</div>
+              <div className="text-3xl sm:text-4xl ml-2">🔄</div>
             </div>
           </div>
         </div>
 
-        {/* Ações rápidas */}
-        <div className="card mb-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Ações Rápidas</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="card mb-6 sm:mb-8">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Ações Rápidas</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {(user?.role === 'farmaceutico' || user?.role === 'chefe') && (
               <Link
                 to="/records/new"
-                className="btn btn-primary text-center"
+                className="btn btn-primary text-center min-h-[44px] flex items-center justify-center"
               >
                 ➕ Registrar Entrega
               </Link>
             )}
-            {user?.role !== 'assistente' && (
+            {user?.role !== 'atendente' && (
               <Link
                 to="/records"
-                className="btn btn-secondary text-center"
+                className="btn btn-secondary text-center min-h-[44px] flex items-center justify-center"
               >
                 📋 Ver Registros
               </Link>
@@ -255,7 +259,7 @@ export default function Dashboard() {
             {user?.role !== 'admin' && (
               <Link
                 to="/swaps"
-                className="btn btn-secondary text-center"
+                className="btn btn-secondary text-center min-h-[44px] flex items-center justify-center"
               >
                 🔄 Trocas de Plantão
               </Link>
@@ -264,13 +268,13 @@ export default function Dashboard() {
               <>
                 <Link
                   to="/shifts"
-                  className="btn btn-secondary text-center"
+                  className="btn btn-secondary text-center min-h-[44px] flex items-center justify-center"
                 >
                   📅 Gerenciar Plantões
                 </Link>
                 <Link
                   to="/timeline"
-                  className="btn btn-secondary text-center"
+                  className="btn btn-secondary text-center min-h-[44px] flex items-center justify-center"
                 >
                   📊 Histórico
                 </Link>
@@ -279,11 +283,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Registros recentes - apenas para não assistentes */}
-          {user?.role !== 'assistente' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+          {user?.role !== 'atendente' && (
             <div className="card">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">
                 {user?.role === 'chefe' || user?.role === 'admin' ? 'Histórico de Atividades' : 'Minhas Atividades'}
               </h2>
               {recentRecords.length === 0 ? (
@@ -292,18 +295,18 @@ export default function Dashboard() {
                 <div className="space-y-3">
                   {recentRecords.map((record) => (
                     <div key={record.id} className="border border-gray-200 rounded-lg p-3">
-                      <div className="flex justify-between items-start">
-                        <div>
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                        <div className="flex-1">
                           <p className="font-medium text-gray-900">{record.med?.name}</p>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-xs sm:text-sm text-gray-600">
                             Entregue por: {record.deliveredBy?.name || record.deliveredBy?.email}
                           </p>
                         </div>
-                        <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadge(record.status)}`}>
+                        <span className={`text-xs px-2 py-1 rounded-full self-start ${getStatusBadge(record.status)}`}>
                           {record.status}
                         </span>
                       </div>
-                      <div className="mt-2 flex gap-4 text-sm text-gray-600">
+                      <div className="mt-2 flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
                         <span>📦 {record.qtyDelivered} {record.med?.unit}</span>
                         {record.qtyReceived && <span>✅ {record.qtyReceived} recebidas</span>}
                       </div>
@@ -320,10 +323,9 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Próximos plantões ou Colegas de Trabalho (assistentes) */}
           <div className="card">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
-              {user?.role === 'assistente' ? 'Colegas de Trabalho Hoje' : 'Meus Próximos Plantões'}
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">
+              {user?.role === 'atendente' ? 'Colegas de Trabalho Hoje' : 'Meus Próximos Plantões'}
             </h2>
             {upcomingShifts.length === 0 ? (
               <p className="text-gray-500 text-center py-4">Nenhum plantão agendado</p>
@@ -332,20 +334,20 @@ export default function Dashboard() {
                 {upcomingShifts.map((shift) => (
                   <div key={shift.id} className="border border-gray-200 rounded-lg p-3">
                     <div className="flex items-start gap-3">
-                      <div className="text-2xl">👤</div>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">
+                      <div className="text-xl sm:text-2xl">👤</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">
                           {shift.employee?.name || 'Não atribuído'}
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-xs sm:text-sm text-gray-500">
                           {shift.employee?.role === 'farmaceutico' ? 'Farmacêutico' : 
                            shift.employee?.role === 'chefe' ? 'Chefe' : 
-                           shift.employee?.role === 'assistente' ? 'Assistente' : 'Outro'}
+                           shift.employee?.role === 'atendente' ? 'Atendente de Farmácia' : 'Outro'}
                         </p>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-xs sm:text-sm text-gray-600">
                           📅 {new Date(shift.start).toLocaleDateString('pt-BR')}
                         </p>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-xs sm:text-sm text-gray-600">
                           🕐 {new Date(shift.start).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {new Date(shift.end).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
@@ -365,6 +367,13 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {showHandoverModal && user && (
+        <ShiftHandoverModal
+          user={user}
+          onClose={() => setShowHandoverModal(false)}
+        />
+      )}
     </>
   );
 }

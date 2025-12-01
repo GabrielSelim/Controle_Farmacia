@@ -14,9 +14,9 @@ export const createSwapRequest = async (req, res) => {
         return res.status(404).json({ error: 'Usuário alvo não encontrado' });
       }
       
-      // Assistente: só pode trocar com outros assistentes
-      if (req.user.role === 'assistente' && targetUser.role !== 'assistente') {
-        return res.status(403).json({ error: 'Assistentes só podem trocar plantões com outros assistentes' });
+      // Atendente: só pode trocar com outros atendentes
+      if (req.user.role === 'atendente' && targetUser.role !== 'atendente') {
+        return res.status(403).json({ error: 'Atendentes só podem trocar plantões com outros atendentes' });
       }
       
       // Chefe: só pode trocar com farmacêuticos e outros chefes
@@ -86,7 +86,6 @@ export const createSwapRequest = async (req, res) => {
 
     res.status(201).json(swap);
   } catch (error) {
-    console.error('Erro ao criar solicitação de troca:', error);
     res.status(500).json({ error: 'Erro ao criar solicitação de troca' });
   }
 };
@@ -103,8 +102,8 @@ export const listSwapRequests = async (req, res) => {
       where.status = status;
     }
     
-    // Se for assistente, só pode ver trocas onde ele é parte
-    if (user.role === 'assistente') {
+    // Se for atendente, só pode ver trocas onde ele é parte
+    if (user.role === 'atendente') {
       where.OR = [
         { requesterId: user.id },
         { targetId: user.id }
@@ -123,7 +122,6 @@ export const listSwapRequests = async (req, res) => {
 
     res.json(swaps);
   } catch (error) {
-    console.error('Erro ao listar solicitações de troca:', error);
     res.status(500).json({ error: 'Erro ao listar solicitações de troca' });
   }
 };
@@ -167,7 +165,6 @@ export const respondSwapRequest = async (req, res) => {
 
     res.json(updated);
   } catch (error) {
-    console.error('Erro ao responder solicitação:', error);
     res.status(500).json({ error: 'Erro ao responder solicitação' });
   }
 };
@@ -189,6 +186,7 @@ export const approveSwapRequest = async (req, res) => {
     const updated = await prisma.shiftSwapRequest.update({
       where: { id },
       data: {
+        status: 'aprovado',
         approvedBy: req.user?.email,
         approvedAt: new Date()
       }
@@ -230,7 +228,6 @@ export const approveSwapRequest = async (req, res) => {
 
     res.json(updated);
   } catch (error) {
-    console.error('Erro ao aprovar troca:', error);
     res.status(500).json({ error: 'Erro ao aprovar troca' });
   }
 };
@@ -272,7 +269,6 @@ export const cancelSwapRequest = async (req, res) => {
 
     res.json(updated);
   } catch (error) {
-    console.error('Erro ao cancelar solicitação:', error);
     res.status(500).json({ error: 'Erro ao cancelar solicitação' });
   }
 };
