@@ -26,4 +26,4 @@ RUN mkdir -p uploads/records
 EXPOSE 3001
 
 # Comando para iniciar
-CMD ["sh", "-c", "npx prisma migrate deploy && node src/server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node src/index.js"]
